@@ -1,0 +1,8 @@
+<resources>
+    <string name="app_name">samplex</string>
+    <string name="welcome_title">Want to revise or take a quiz?</string>
+    <string name="upload_instruction">Drop your PDF here</string>
+    <string name="processing_message">This might take a few minutes</string>
+    <string name="menu">Menu</string>
+    <string name="profile">Profile</string>
+</resources>
