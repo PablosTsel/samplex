@@ -1,5 +1,8 @@
 package es.uc3m.android.samplex
 
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import com.google.firebase.auth.AuthResult
+import androidx.compose.ui.draw.rotate
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -12,33 +15,23 @@ import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.*
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
+import androidx.compose.ui.*
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.*
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -48,24 +41,309 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 import es.uc3m.android.samplex.ui.theme.SamplexTheme
 
+
 class MainActivity : ComponentActivity() {
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             SamplexTheme {
-                LuxuryHomeScreen()
+
+                // 1) Verificamos si hay un usuario logueado
+                val auth = FirebaseAuth.getInstance()
+                val currentUser = auth.currentUser
+
+                // 2) Manejamos un estado para saber si estamos logueados o no
+                var isLoggedIn by remember { mutableStateOf(currentUser != null) }
+
+                // 3) Si estamos logueados, mostramos LuxuryHomeScreen; si no, la pantalla de Login
+                if (isLoggedIn) {
+                    // Pasamos una lambda de logout para cerrar sesión desde LuxuryHomeScreen
+                    LuxuryHomeScreen(
+                        onLogout = {
+                            auth.signOut()
+                            isLoggedIn = false
+                        }
+                    )
+                } else {
+                    // Pantalla de autenticación (login/registro)
+                    AuthScreen(
+                        onLoginSuccess = {
+                            // Una vez se inicie sesión o se cree usuario, marcamos isLoggedIn
+                            isLoggedIn = true
+                        }
+                    )
+                }
             }
         }
     }
 }
 
+/**
+ * Pantalla de autenticación (login y/o registro) con un look similar a LuxuryHomeScreen.
+ */
+@Composable
+fun AuthScreen(onLoginSuccess: () -> Unit) {
+    // Gradientes
+    val backgroundGradient = Brush.verticalGradient(
+        listOf(
+            Color(0xFF1A1A2E),
+            Color(0xFF16213E),
+            Color(0xFF0F3460)
+        )
+    )
+    val cardBackground = Brush.linearGradient(
+        colors = listOf(
+            Color(0xFF1E293B).copy(alpha = 0.9f),
+            Color(0xFF0F172A).copy(alpha = 0.9f)
+        )
+    )
+    val goldColor = Color(0xFFD4AF37)
+
+    // Estados para email/contraseña y para alternar entre "login" y "registro"
+    var email by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var isRegisterMode by remember { mutableStateOf(false) }
+
+    // Obtenemos la instancia de FirebaseAuth
+    val auth = FirebaseAuth.getInstance()
+
+    Scaffold(
+        topBar = {
+            // Top bar con el nombre de la app “Samplex”
+            Surface(
+                modifier = Modifier.shadow(8.dp),
+                color = Color.Transparent
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(brush = cardBackground)
+                        .padding(12.dp)
+                ) {
+                    // Logo/Title en el centro
+                    Row(
+                        modifier = Modifier.align(Alignment.Center),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = buildAnnotatedString {
+                                withStyle(
+                                    style = SpanStyle(
+                                        fontWeight = FontWeight.Light,
+                                        color = Color.White
+                                    )
+                                ) {
+                                    append("sample")
+                                }
+                                withStyle(
+                                    style = SpanStyle(
+                                        fontWeight = FontWeight.Bold,
+                                        color = goldColor
+                                    )
+                                ) {
+                                    append("x")
+                                }
+                            },
+                            style = MaterialTheme.typography.headlineMedium.copy(
+                                letterSpacing = 2.sp
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(brush = backgroundGradient)
+                .padding(paddingValues)
+        ) {
+
+            // Contenido centrado
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                // Título que cambia según login/register
+                Text(
+                    text = if (isRegisterMode) "Create Account" else "Sign In",
+                    style = MaterialTheme.typography.headlineSmall.copy(
+                        fontWeight = FontWeight.Light,
+                        letterSpacing = 1.sp
+                    ),
+                    color = Color.White
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Card con los textfields de email y password
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .shadow(16.dp, RoundedCornerShape(16.dp)),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(brush = cardBackground)
+                            .padding(24.dp)
+                    ) {
+                        Column {
+                            OutlinedTextField(
+                                value = email,
+                                onValueChange = { email = it },
+                                label = {
+                                    Text(
+                                        "Email",
+                                        color = Color.White.copy(alpha = 0.7f)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = goldColor,
+                                    unfocusedBorderColor = Color(0xFF94A3B8),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = goldColor,
+                                    focusedContainerColor = Color(0xFF1E293B),
+                                    unfocusedContainerColor = Color(0xFF1E293B)
+                                ),
+                                shape = RoundedCornerShape(8.dp)
+                            )
+
+                            Spacer(modifier = Modifier.height(16.dp))
+
+                            OutlinedTextField(
+                                value = password,
+                                onValueChange = { password = it },
+                                label = {
+                                    Text(
+                                        "Password",
+                                        color = Color.White.copy(alpha = 0.7f)
+                                    )
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = OutlinedTextFieldDefaults.colors(
+                                    focusedBorderColor = goldColor,
+                                    unfocusedBorderColor = Color(0xFF94A3B8),
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White,
+                                    cursorColor = goldColor,
+                                    focusedContainerColor = Color(0xFF1E293B),
+                                    unfocusedContainerColor = Color(0xFF1E293B)
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                visualTransformation = PasswordVisualTransformation()
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Botón para "Login" o "Create Account"
+                Button(
+                    onClick = {
+                        if (isRegisterMode) {
+                            // Lógica para crear usuario
+                            auth.createUserWithEmailAndPassword(email, password)
+                                .addOnCompleteListener { task: com.google.android.gms.tasks.Task<AuthResult> ->
+                                    if (task.isSuccessful) {
+                                        onLoginSuccess()
+                                    } else {
+                                        println("Error creando usuario: ${task.exception}")
+                                    }
+                                }
+                        } else {
+                            // Lógica para iniciar sesión
+                            auth.signInWithEmailAndPassword(email, password)
+                                .addOnCompleteListener { task: com.google.android.gms.tasks.Task<AuthResult> ->
+                                    if (task.isSuccessful) {
+                                        onLoginSuccess()
+                                    } else {
+                                        println("Error al iniciar sesión: ${task.exception}")
+                                    }
+                                }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = goldColor,
+                        contentColor = Color(0xFF0F172A)
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = if (isRegisterMode) "Create Account" else "Sign In",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Botón para alternar entre login/register
+                TextButton(onClick = { isRegisterMode = !isRegisterMode }) {
+                    Text(
+                        text = if (isRegisterMode) "Already have an account? Sign In"
+                        else "Don't have an account? Create one",
+                        color = goldColor
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Botón sign in with Google (sin implementar la lógica real)
+                OutlinedButton(
+                    onClick = {
+                        // TODO: Implement Google Sign-In
+                        println("Sign in with Google (no implementado)")
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    border = BorderStroke(1.dp, goldColor),
+                    colors = ButtonDefaults.outlinedButtonColors(
+                        containerColor = Color.Transparent,
+                        contentColor = goldColor
+                    ),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Text(
+                        text = "Sign in with Google",
+                        style = MaterialTheme.typography.bodyLarge.copy(
+                            letterSpacing = 1.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Pantalla principal (como antes), pero con soporte para logout.
+ * Añadimos un parámetro onLogout para llamar a FirebaseAuth.signOut()
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LuxuryHomeScreen() {
-    // Premium color palette
+fun LuxuryHomeScreen(
+    onLogout: () -> Unit = {}
+) {
+    // (El contenido es esencialmente el mismo que tenías, con un cambio en “Log Out”)
     val goldGradient = Brush.linearGradient(
         colors = listOf(
             Color(0xFFD4AF37),
@@ -178,47 +456,36 @@ fun LuxuryHomeScreen() {
                         DropdownMenu(
                             expanded = showProfileMenu,
                             onDismissRequest = { showProfileMenu = false },
-                            modifier = Modifier
-                                .background(
-                                    brush = cardBackground
-                                )
+                            modifier = Modifier.background(brush = cardBackground)
                         ) {
                             DropdownMenuItem(
                                 text = {
-                                    Text(
-                                        "My Account",
-                                        color = Color.White
-                                    )
+                                    Text("My Account", color = Color.White)
                                 },
                                 onClick = {
                                     showProfileMenu = false
-                                    /* TODO: Navigate to account screen */
+                                    // TODO: Navigate to account screen
                                 }
                             )
                             Divider(color = Color(0xFF334155))
                             DropdownMenuItem(
                                 text = {
-                                    Text(
-                                        "Settings",
-                                        color = Color.White
-                                    )
+                                    Text("Settings", color = Color.White)
                                 },
                                 onClick = {
                                     showProfileMenu = false
-                                    /* TODO: Navigate to settings screen */
+                                    // TODO: Navigate to settings screen
                                 }
                             )
                             Divider(color = Color(0xFF334155))
                             DropdownMenuItem(
                                 text = {
-                                    Text(
-                                        "Log Out",
-                                        color = Color(0xFFD4AF37)
-                                    )
+                                    Text("Log Out", color = Color(0xFFD4AF37))
                                 },
                                 onClick = {
                                     showProfileMenu = false
-                                    /* TODO: Handle logout */
+                                    // Llamamos al callback para cerrar sesión
+                                    onLogout()
                                 }
                             )
                         }
@@ -234,14 +501,13 @@ fun LuxuryHomeScreen() {
                 .padding(paddingValues)
         ) {
             if (showExamForm) {
-                // Exam creation form with luxury styling
+                // == FORMULARIO DE NUEVO EXAMEN ==
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Form title with premium styling
                     Text(
                         text = "Create New Exam Roadmap",
                         style = MaterialTheme.typography.headlineMedium.copy(
@@ -252,11 +518,12 @@ fun LuxuryHomeScreen() {
                         modifier = Modifier.padding(bottom = 32.dp)
                     )
 
-                    // Subject name field with luxury styling
                     OutlinedTextField(
                         value = subjectName,
                         onValueChange = { subjectName = it },
-                        label = { Text("Subject Name", color = Color.White.copy(alpha = 0.7f)) },
+                        label = {
+                            Text("Subject Name", color = Color.White.copy(alpha = 0.7f))
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
@@ -272,11 +539,12 @@ fun LuxuryHomeScreen() {
                         shape = RoundedCornerShape(8.dp)
                     )
 
-                    // Exam date field with luxury styling
                     OutlinedTextField(
                         value = examDate,
                         onValueChange = { examDate = it },
-                        label = { Text("Exam Date (DD/MM/YYYY)", color = Color.White.copy(alpha = 0.7f)) },
+                        label = {
+                            Text("Exam Date (DD/MM/YYYY)", color = Color.White.copy(alpha = 0.7f))
+                        },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 8.dp),
@@ -304,7 +572,7 @@ fun LuxuryHomeScreen() {
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // PDF Drop zone with premium styling
+                    // PDF Drop zone (mock)
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -376,12 +644,11 @@ fun LuxuryHomeScreen() {
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Buttons with premium styling
+                    // Buttons (Cancel / Create)
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Cancel button
                         val cancelInteractionSource = remember { MutableInteractionSource() }
                         val cancelIsPressed by cancelInteractionSource.collectIsPressedAsState()
                         val cancelScale by animateFloatAsState(
@@ -414,7 +681,6 @@ fun LuxuryHomeScreen() {
                             )
                         }
 
-                        // Create button
                         val createInteractionSource = remember { MutableInteractionSource() }
                         val createIsPressed by createInteractionSource.collectIsPressedAsState()
                         val createScale by animateFloatAsState(
@@ -451,14 +717,13 @@ fun LuxuryHomeScreen() {
                     }
                 }
             } else {
-                // Main screen with "Create Exam Roadmap" button with luxury styling
+                // == PANTALLA PRINCIPAL ==
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
                         .padding(24.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // Instruction text with premium styling
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -489,7 +754,6 @@ fun LuxuryHomeScreen() {
 
                     Spacer(modifier = Modifier.height(48.dp))
 
-                    // Create Exam Roadmap button with luxury styling
                     val interactionSource = remember { MutableInteractionSource() }
                     val isPressed by interactionSource.collectIsPressedAsState()
                     val scale by animateFloatAsState(
@@ -582,7 +846,6 @@ fun LuxuryHomeScreen() {
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Previous/Ongoing Exams dropdown with luxury styling
                     Card(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -596,7 +859,7 @@ fun LuxuryHomeScreen() {
                                 .fillMaxWidth()
                                 .background(brush = cardBackground)
                         ) {
-                            // Dropdown header with luxury styling
+                            // Dropdown header
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
@@ -623,7 +886,6 @@ fun LuxuryHomeScreen() {
                                 )
                             }
 
-                            // Dropdown content with luxury styling and animation
                             AnimatedVisibility(
                                 visible = showExamsDropdown,
                                 enter = fadeIn() + expandVertically(),
@@ -631,7 +893,6 @@ fun LuxuryHomeScreen() {
                             ) {
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     Divider(color = Color(0xFF334155))
-                                    // Example exams
                                     listOf("Geography", "History", "Literature").forEach { subject ->
                                         Row(
                                             modifier = Modifier
@@ -657,7 +918,7 @@ fun LuxuryHomeScreen() {
                                                 color = Color(0xFFD4AF37)
                                             )
                                         }
-                                        if (subject != "Literature") {  // Don't add divider after the last item
+                                        if (subject != "Literature") {
                                             Divider(
                                                 color = Color(0xFF334155),
                                                 modifier = Modifier.padding(horizontal = 20.dp)
@@ -674,6 +935,7 @@ fun LuxuryHomeScreen() {
     }
 }
 
+// Vista previa
 @Preview(showBackground = true)
 @Composable
 fun LuxuryHomeScreenPreview() {
@@ -681,3 +943,4 @@ fun LuxuryHomeScreenPreview() {
         LuxuryHomeScreen()
     }
 }
+
