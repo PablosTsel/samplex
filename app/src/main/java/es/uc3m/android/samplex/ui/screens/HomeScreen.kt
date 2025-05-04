@@ -76,6 +76,7 @@ fun HomeScreen(
     var showProfileMenu by remember { mutableStateOf(false) }
     var showExamForm by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
+    var showAccountScreen by remember { mutableStateOf(false) }
     var subjectName by remember { mutableStateOf("") }
     var examDate by remember { mutableStateOf<Date?>(null) }
     var showExamsDropdown by remember { mutableStateOf(false) }
@@ -100,6 +101,10 @@ fun HomeScreen(
     if (showSettingsScreen) {
         SettingsScreen(
             onBackClick = { showSettingsScreen = false }
+        )
+    } else if (showAccountScreen) {
+        AccountScreen(
+            onBackClick = { showAccountScreen = false }
         )
     } else {
         Scaffold(
@@ -172,7 +177,7 @@ fun HomeScreen(
                                     },
                                     onClick = {
                                         showProfileMenu = false
-                                        showSettingsScreen = true
+                                        showAccountScreen = true
                                     }
                                 )
                                 DropdownMenuItem(
