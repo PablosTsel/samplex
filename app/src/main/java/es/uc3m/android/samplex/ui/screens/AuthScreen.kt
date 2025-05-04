@@ -24,6 +24,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import es.uc3m.android.samplex.R
+import es.uc3m.android.samplex.ui.theme.BabyBlue
+import es.uc3m.android.samplex.ui.theme.BabyBlueDark
+import es.uc3m.android.samplex.ui.theme.BabyBlueLight
+import es.uc3m.android.samplex.ui.theme.ErrorColor
+import es.uc3m.android.samplex.ui.theme.LightBackground
+import es.uc3m.android.samplex.ui.theme.LightSurface
+import es.uc3m.android.samplex.ui.theme.LightText
+import es.uc3m.android.samplex.ui.theme.LightSecondaryText
 import es.uc3m.android.samplex.viewmodel.AuthViewModel
 
 @Composable
@@ -51,30 +59,23 @@ fun AuthScreen(
     // Gradient definitions
     val backgroundGradient = Brush.verticalGradient(
         listOf(
-            Color(0xFF1A1A2E),
-            Color(0xFF16213E),
-            Color(0xFF0F3460)
+            LightBackground,
+            LightBackground.copy(alpha = 0.95f),
+            Color.White
         )
     )
-    val cardBackground = Brush.linearGradient(
-        colors = listOf(
-            Color(0xFF1E293B).copy(alpha = 0.9f),
-            Color(0xFF0F172A).copy(alpha = 0.9f)
-        )
-    )
-    val goldColor = Color(0xFFD4AF37)
     
     Scaffold(
         topBar = {
             // Top bar with the app name "Samplex"
             Surface(
-                modifier = Modifier.shadow(8.dp),
-                color = Color.Transparent
+                modifier = Modifier.shadow(2.dp),
+                color = BabyBlue
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .background(brush = cardBackground)
+                        .background(BabyBlue)
                         .padding(12.dp)
                 ) {
                     // Logo/Title in the center
@@ -87,7 +88,7 @@ fun AuthScreen(
                                 withStyle(
                                     style = SpanStyle(
                                         fontWeight = FontWeight.Light,
-                                        color = Color.White
+                                        color = LightText
                                     )
                                 ) {
                                     append("sample")
@@ -95,7 +96,7 @@ fun AuthScreen(
                                 withStyle(
                                     style = SpanStyle(
                                         fontWeight = FontWeight.Bold,
-                                        color = goldColor
+                                        color = BabyBlueDark
                                     )
                                 ) {
                                     append("x")
@@ -133,7 +134,7 @@ fun AuthScreen(
                         fontWeight = FontWeight.Light,
                         letterSpacing = 1.sp
                     ),
-                    color = Color.White
+                    color = LightText
                 )
                 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -142,14 +143,13 @@ fun AuthScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .shadow(16.dp, RoundedCornerShape(16.dp)),
+                        .shadow(4.dp, RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color.Transparent)
+                    colors = CardDefaults.cardColors(containerColor = LightSurface)
                 ) {
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .background(brush = cardBackground)
                             .padding(24.dp)
                     ) {
                         Column {
@@ -159,18 +159,18 @@ fun AuthScreen(
                                 label = {
                                     Text(
                                         stringResource(id = R.string.email),
-                                        color = Color.White.copy(alpha = 0.7f)
+                                        color = LightSecondaryText
                                     )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = goldColor,
-                                    unfocusedBorderColor = Color(0xFF94A3B8),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = goldColor,
-                                    focusedContainerColor = Color(0xFF1E293B),
-                                    unfocusedContainerColor = Color(0xFF1E293B)
+                                    focusedBorderColor = BabyBlueDark,
+                                    unfocusedBorderColor = BabyBlue,
+                                    focusedTextColor = LightText,
+                                    unfocusedTextColor = LightText,
+                                    cursorColor = BabyBlueDark,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
                                 ),
                                 shape = RoundedCornerShape(8.dp)
                             )
@@ -183,117 +183,126 @@ fun AuthScreen(
                                 label = {
                                     Text(
                                         stringResource(id = R.string.password),
-                                        color = Color.White.copy(alpha = 0.7f)
+                                        color = LightSecondaryText
                                     )
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = goldColor,
-                                    unfocusedBorderColor = Color(0xFF94A3B8),
-                                    focusedTextColor = Color.White,
-                                    unfocusedTextColor = Color.White,
-                                    cursorColor = goldColor,
-                                    focusedContainerColor = Color(0xFF1E293B),
-                                    unfocusedContainerColor = Color(0xFF1E293B)
+                                    focusedBorderColor = BabyBlueDark,
+                                    unfocusedBorderColor = BabyBlue,
+                                    focusedTextColor = LightText,
+                                    unfocusedTextColor = LightText,
+                                    cursorColor = BabyBlueDark,
+                                    focusedContainerColor = Color.Transparent,
+                                    unfocusedContainerColor = Color.Transparent
                                 ),
                                 shape = RoundedCornerShape(8.dp),
                                 visualTransformation = PasswordVisualTransformation()
                             )
                             
-                            // Show error message if there is one
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            // Main action button (Sign In or Create Account)
+                            Button(
+                                onClick = {
+                                    if (isRegisterMode) {
+                                        authViewModel.createAccount(email, password)
+                                    } else {
+                                        authViewModel.signIn(email, password)
+                                    }
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                enabled = !isLoading,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = BabyBlueDark,
+                                    contentColor = Color.White,
+                                    disabledContainerColor = BabyBlue.copy(alpha = 0.6f)
+                                )
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(
+                                            id = if (isRegisterMode) R.string.create_account else R.string.sign_in
+                                        )
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Toggle button between Sign In and Create Account
+                            TextButton(
+                                onClick = { isRegisterMode = !isRegisterMode },
+                                modifier = Modifier.align(Alignment.CenterHorizontally),
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = BabyBlueDark
+                                )
+                            ) {
+                                Text(
+                                    text = stringResource(
+                                        id = if (isRegisterMode) R.string.login_register_toggle else R.string.register_login_toggle
+                                    )
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(8.dp))
+                            
+                            // Alternative sign in methods (like Google)
+                            // This could be a divider with "or" text
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Divider(
+                                    modifier = Modifier.weight(1f),
+                                    color = Color.Gray.copy(alpha = 0.3f)
+                                )
+                                Text(
+                                    text = "or",
+                                    color = LightSecondaryText,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
+                                )
+                                Divider(
+                                    modifier = Modifier.weight(1f),
+                                    color = Color.Gray.copy(alpha = 0.3f)
+                                )
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Google sign in button
+                            OutlinedButton(
+                                onClick = { /* TODO: Implement Google Sign In */ },
+                                modifier = Modifier.fillMaxWidth(),
+                                border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
+                                colors = ButtonDefaults.outlinedButtonColors(
+                                    contentColor = LightText
+                                )
+                            ) {
+                                Text(stringResource(id = R.string.sign_in_google))
+                            }
+                            
+                            // Error message
                             AnimatedVisibility(
                                 visible = authError != null,
                                 enter = fadeIn(),
                                 exit = fadeOut()
                             ) {
-                                authError?.let {
-                                    Text(
-                                        text = it,
-                                        color = MaterialTheme.colorScheme.error,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        modifier = Modifier.padding(top = 8.dp)
-                                    )
-                                }
+                                Text(
+                                    text = authError ?: "",
+                                    color = ErrorColor,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 16.dp)
+                                )
                             }
                         }
                     }
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Button for "Login" or "Create Account"
-                Button(
-                    onClick = {
-                        if (isRegisterMode) {
-                            authViewModel.createAccount(email, password)
-                        } else {
-                            authViewModel.signIn(email, password)
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = goldColor,
-                        contentColor = Color(0xFF0F172A)
-                    ),
-                    shape = RoundedCornerShape(8.dp),
-                    enabled = !isLoading
-                ) {
-                    if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(24.dp),
-                            color = Color(0xFF0F172A),
-                            strokeWidth = 2.dp
-                        )
-                    } else {
-                        Text(
-                            text = stringResource(
-                                id = if (isRegisterMode) R.string.create_account else R.string.sign_in
-                            ),
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                letterSpacing = 1.sp,
-                                fontWeight = FontWeight.Medium
-                            )
-                        )
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Button to toggle between login/register
-                TextButton(onClick = { isRegisterMode = !isRegisterMode }) {
-                    Text(
-                        text = stringResource(
-                            id = if (isRegisterMode) 
-                                R.string.login_register_toggle
-                            else 
-                                R.string.register_login_toggle
-                        ),
-                        color = goldColor
-                    )
-                }
-                
-                Spacer(modifier = Modifier.height(24.dp))
-                
-                // Button sign in with Google (not fully implemented)
-                OutlinedButton(
-                    onClick = {
-                        // TODO: Implement Google Sign-In
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    border = BorderStroke(1.dp, goldColor),
-                    colors = ButtonDefaults.outlinedButtonColors(
-                        containerColor = Color.Transparent,
-                        contentColor = goldColor
-                    ),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(
-                        text = stringResource(id = R.string.sign_in_google),
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            letterSpacing = 1.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    )
                 }
             }
         }

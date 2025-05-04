@@ -14,6 +14,7 @@ import es.uc3m.android.samplex.ui.screens.AuthScreen
 import es.uc3m.android.samplex.ui.screens.HomeScreen
 import es.uc3m.android.samplex.ui.theme.SamplexTheme
 import es.uc3m.android.samplex.viewmodel.AuthViewModel
+import es.uc3m.android.samplex.viewmodel.UserViewModel
 
 class MainActivity : ComponentActivity() {
 
@@ -25,10 +26,13 @@ class MainActivity : ComponentActivity() {
             SamplexTheme {
                 // Using the ViewModel to determine authentication state
                 val authViewModel: AuthViewModel = viewModel()
+                val userViewModel: UserViewModel = viewModel()
                 val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
                 
                 // Display either AuthScreen or HomeScreen based on auth state
                 if (isLoggedIn) {
+                    // Fetch user data if logged in
+                    userViewModel.fetchUserData()
                     HomeScreen()
                 } else {
                     AuthScreen(

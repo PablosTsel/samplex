@@ -31,6 +31,15 @@
     <string name="select_date">Select Date</string>
     <string name="success_message">Your exam roadmap is being created!</string>
     
+    <!-- Settings Screen -->
+    <string name="profile_settings">Profile Settings</string>
+    <string name="nombre">Name</string>
+    <string name="apellidos">Last Name</string>
+    <string name="curso">Course</string>
+    <string name="save_changes">Save Changes</string>
+    <string name="profile_updated">Profile updated successfully!</string>
+    <string name="back">Back</string>
+    
     <!-- Error Messages -->
     <string name="error_login">Error al iniciar sesión: %1$s</string>
     <string name="error_register">Error creando usuario: %1$s</string>
