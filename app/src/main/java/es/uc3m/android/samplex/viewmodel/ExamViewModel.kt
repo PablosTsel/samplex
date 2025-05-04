@@ -31,6 +31,14 @@ class ExamViewModel : ViewModel() {
     private val _exams = MutableStateFlow<List<Exam>>(emptyList())
     val exams: StateFlow<List<Exam>> = _exams
     
+    // Current exam state for exam detail screen
+    private val _currentExam = MutableStateFlow<Exam?>(null)
+    val currentExam: StateFlow<Exam?> = _currentExam
+    
+    // Last created exam ID
+    private val _lastCreatedExamId = MutableStateFlow<String?>(null)
+    val lastCreatedExamId: StateFlow<String?> = _lastCreatedExamId
+    
     init {
         fetchUserExams()
     }
@@ -80,6 +88,8 @@ class ExamViewModel : ViewModel() {
                 val userRef = db.collection("users").document(currentUser.uid)
                 userRef.update("exams", com.google.firebase.firestore.FieldValue.arrayUnion(examEntry)).await()
                 
+                // Save the last created exam ID
+                _lastCreatedExamId.value = examId
                 _examCreated.value = true
                 
                 // Refresh exam list
@@ -90,6 +100,53 @@ class ExamViewModel : ViewModel() {
                 _isLoading.value = false
             }
         }
+    }
+    
+    fun fetchExamById(examId: String) {
+        viewModelScope.launch {
+            try {
+                _isLoading.value = true
+                _error.value = null
+                
+                val examDoc = db.collection("exams").document(examId).get().await()
+                if (!examDoc.exists()) {
+                    _error.value = "Exam not found"
+                    _currentExam.value = null
+                    return@launch
+                }
+                
+                val content = examDoc.get("content") as? List<Any> ?: emptyList<Any>()
+                val subjectName = examDoc.getString("subjectName") ?: ""
+                val examDate = examDoc.getDate("examDate") ?: Date()
+                val userId = examDoc.getString("userId") ?: ""
+                val isEmergency = examDoc.getBoolean("isEmergency") ?: false
+                val createdAt = examDoc.getDate("createdAt") ?: Date()
+                val contentUri = examDoc.getString("contentUri")
+                
+                val exam = Exam(
+                    id = examId,
+                    displayName = "$subjectName ${SimpleDateFormat("MMM d", Locale.getDefault()).format(examDate)}",
+                    subjectName = subjectName,
+                    examDate = examDate,
+                    userId = userId,
+                    isEmergency = isEmergency,
+                    createdAt = createdAt,
+                    contentUri = contentUri,
+                    content = content
+                )
+                
+                _currentExam.value = exam
+                
+            } catch (e: Exception) {
+                _error.value = e.message
+            } finally {
+                _isLoading.value = false
+            }
+        }
+    }
+    
+    fun clearCurrentExam() {
+        _currentExam.value = null
     }
     
     private fun fetchUserExams() {
@@ -137,6 +194,10 @@ class ExamViewModel : ViewModel() {
     fun setError(errorMessage: String) {
         _error.value = errorMessage
     }
+    
+    fun clearLastCreatedExamId() {
+        _lastCreatedExamId.value = null
+    }
 }
 
 // Data class to represent an Exam
@@ -149,6 +210,7 @@ data class Exam(
     val isEmergency: Boolean = false,
     val createdAt: Date = Date(),
     val contentUri: String? = null,
+    val content: List<Any> = emptyList(),
     val days: List<StudyDay> = emptyList()
 )
 

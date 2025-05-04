@@ -75,6 +75,8 @@ fun HomeScreen(
     var showExamForm by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
     var showAccountScreen by remember { mutableStateOf(false) }
+    var showExamScreen by remember { mutableStateOf(false) }
+    var selectedExamId by remember { mutableStateOf("") }
     var subjectName by remember { mutableStateOf("") }
     var examDate by remember { mutableStateOf<Date?>(null) }
     var showExamsDropdown by remember { mutableStateOf(false) }
@@ -87,14 +89,18 @@ fun HomeScreen(
     val error by examViewModel.error.collectAsState()
     val examCreated by examViewModel.examCreated.collectAsState()
     val exams by examViewModel.exams.collectAsState()
+    val lastCreatedExamId by examViewModel.lastCreatedExamId.collectAsState()
 
-    // Hide the form when exam is created
+    // When an exam is created, navigate to the exam screen
     LaunchedEffect(examCreated) {
         if (examCreated) {
             showExamForm = false
-            // Show the exams dropdown when a new exam is created
-            if (exams.isNotEmpty()) {
-                showExamsDropdown = true
+            
+            // If we have the ID of the last created exam, navigate to it
+            lastCreatedExamId?.let { examId ->
+                selectedExamId = examId
+                showExamScreen = true
+                examViewModel.clearLastCreatedExamId()
             }
         }
     }
@@ -112,6 +118,14 @@ fun HomeScreen(
     } else if (showAccountScreen) {
         AccountScreen(
             onBackClick = { showAccountScreen = false }
+        )
+    } else if (showExamScreen && selectedExamId.isNotEmpty()) {
+        ExamScreen(
+            examId = selectedExamId,
+            onBackClick = {
+                showExamScreen = false
+                selectedExamId = ""
+            }
         )
     } else {
         Scaffold(
@@ -277,7 +291,7 @@ fun HomeScreen(
                                 Spacer(modifier = Modifier.height(8.dp))
                                 
                                 Text(
-                                    text = stringResource(id = R.string.upload_instruction),
+                                    text = "",
                                     style = MaterialTheme.typography.bodyLarge,
                                     color = LightSecondaryText,
                                     textAlign = TextAlign.Center
@@ -352,7 +366,11 @@ fun HomeScreen(
                                         shape = RoundedCornerShape(12.dp),
                                         colors = CardDefaults.cardColors(
                                             containerColor = Color.LightGray.copy(alpha = 0.3f)
-                                        )
+                                        ),
+                                        onClick = {
+                                            selectedExamId = exam.id
+                                            showExamScreen = true
+                                        }
                                     ) {
                                         Box(
                                             modifier = Modifier
@@ -368,42 +386,6 @@ fun HomeScreen(
                                     }
                                 }
                             }
-                        }
-                    }
-                    
-                    // Show success message if exam was created
-                    AnimatedVisibility(
-                        visible = examCreated,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        Card(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 16.dp),
-                            shape = RoundedCornerShape(16.dp),
-                            colors = CardDefaults.cardColors(containerColor = SuccessColor.copy(alpha = 0.7f))
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(16.dp),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Text(
-                                    text = stringResource(id = R.string.success_message),
-                                    color = Color.White,
-                                    style = MaterialTheme.typography.bodyLarge.copy(
-                                        fontWeight = FontWeight.Medium
-                                    )
-                                )
-                            }
-                        }
-                        
-                        // Auto-hide success message after a delay
-                        LaunchedEffect(examCreated) {
-                            kotlinx.coroutines.delay(3000)
-                            examViewModel.resetExamCreated()
                         }
                     }
                 }
