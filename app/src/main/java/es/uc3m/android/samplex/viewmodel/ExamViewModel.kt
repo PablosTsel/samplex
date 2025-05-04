@@ -11,6 +11,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.Date
 import java.util.UUID
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 class ExamViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
@@ -46,23 +48,37 @@ class ExamViewModel : ViewModel() {
                     return@launch
                 }
                 
+                // Generate a unique ID for the exam
                 val examId = UUID.randomUUID().toString()
-                val exam = Exam(
-                    id = examId,
-                    subjectName = subjectName,
-                    examDate = examDate,
-                    userId = currentUser.uid,
-                    isEmergency = isEmergency,
-                    createdAt = Date(),
-                    contentUri = contentUri?.toString()
+                
+                // Format date for name field (e.g., "Math May 15")
+                val dateFormatter = SimpleDateFormat("MMM d", Locale.getDefault())
+                val formattedDate = dateFormatter.format(examDate)
+                val examName = "$subjectName $formattedDate"
+                
+                // Create exam entry for user document
+                val examEntry = hashMapOf(
+                    "name" to examName,
+                    "id" to examId
                 )
                 
-                // Add to Firestore
-                db.collection("exams").document(examId).set(exam).await()
+                // Create exam document
+                val examData = hashMapOf(
+                    "content" to arrayListOf<Any>(),
+                    "subjectName" to subjectName,
+                    "examDate" to examDate,
+                    "userId" to currentUser.uid,
+                    "isEmergency" to isEmergency,
+                    "createdAt" to Date(),
+                    "contentUri" to contentUri?.toString()
+                )
                 
-                // Add exam ID to user's exam list
+                // Add to Firestore: first create the exam document
+                db.collection("exams").document(examId).set(examData).await()
+                
+                // Then add exam reference to user's exams array
                 val userRef = db.collection("users").document(currentUser.uid)
-                userRef.update("exams", com.google.firebase.firestore.FieldValue.arrayUnion(examId)).await()
+                userRef.update("exams", com.google.firebase.firestore.FieldValue.arrayUnion(examEntry)).await()
                 
                 _examCreated.value = true
                 
@@ -83,26 +99,24 @@ class ExamViewModel : ViewModel() {
                 
                 _isLoading.value = true
                 
-                // Get user's exam IDs
+                // Get user's exam entries from the users collection
                 val userDoc = db.collection("users").document(currentUser.uid).get().await()
-                val examIds = userDoc.get("exams") as? List<String> ?: emptyList()
+                val examEntries = userDoc.get("exams") as? List<Map<String, Any>> ?: emptyList()
                 
-                if (examIds.isEmpty()) {
+                if (examEntries.isEmpty()) {
                     _exams.value = emptyList()
                     return@launch
                 }
                 
-                // Fetch all exams
-                val examsList = mutableListOf<Exam>()
-                examIds.forEach { examId ->
-                    val examDoc = db.collection("exams").document(examId).get().await()
-                    examDoc.toObject(Exam::class.java)?.let { 
-                        examsList.add(it)
-                    }
+                // Convert exam entries to Exam objects
+                val examsList = examEntries.map { entry ->
+                    Exam(
+                        id = entry["id"] as String,
+                        displayName = entry["name"] as String
+                    )
                 }
                 
-                // Sort by date (most recent first)
-                _exams.value = examsList.sortedByDescending { it.examDate }
+                _exams.value = examsList
                 
             } catch (e: Exception) {
                 _error.value = e.message
@@ -119,11 +133,16 @@ class ExamViewModel : ViewModel() {
     fun clearError() {
         _error.value = null
     }
+    
+    fun setError(errorMessage: String) {
+        _error.value = errorMessage
+    }
 }
 
 // Data class to represent an Exam
 data class Exam(
     val id: String = "",
+    val displayName: String = "",
     val subjectName: String = "",
     val examDate: Date = Date(),
     val userId: String = "",

@@ -97,6 +97,17 @@ fun HomeScreen(
     val examCreated by examViewModel.examCreated.collectAsState()
     val exams by examViewModel.exams.collectAsState()
 
+    // Hide the form when exam is created
+    LaunchedEffect(examCreated) {
+        if (examCreated) {
+            showExamForm = false
+            // Show the exams dropdown when a new exam is created
+            if (exams.isNotEmpty()) {
+                showExamsDropdown = true
+            }
+        }
+    }
+
     val dropdownRotation by animateFloatAsState(
         targetValue = if (showExamsDropdown) 180f else 0f,
         animationSpec = spring(stiffness = Spring.StiffnessLow),
@@ -322,9 +333,11 @@ fun HomeScreen(
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                shape = RoundedCornerShape(16.dp),
-                                colors = CardDefaults.cardColors(containerColor = BabyBlueLight.copy(alpha = 0.3f))
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.LightGray.copy(alpha = 0.3f)
+                                )
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -344,51 +357,22 @@ fun HomeScreen(
                                     Card(
                                         modifier = Modifier
                                             .fillMaxWidth()
-                                            .padding(vertical = 8.dp),
-                                        shape = RoundedCornerShape(16.dp),
-                                        colors = CardDefaults.cardColors(containerColor = BabyBlueLight.copy(alpha = 0.3f))
+                                            .padding(vertical = 8.dp, horizontal = 4.dp),
+                                        shape = RoundedCornerShape(12.dp),
+                                        colors = CardDefaults.cardColors(
+                                            containerColor = Color.LightGray.copy(alpha = 0.3f)
+                                        )
                                     ) {
-                                        Column(
+                                        Box(
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .padding(16.dp)
                                         ) {
                                             Text(
-                                                text = exam.subjectName,
+                                                text = exam.displayName,
                                                 style = MaterialTheme.typography.titleMedium,
-                                                color = BabyBlueDark
+                                                color = LightText
                                             )
-                                            
-                                            Spacer(modifier = Modifier.height(4.dp))
-                                            
-                                            Row(
-                                                verticalAlignment = Alignment.CenterVertically
-                                            ) {
-                                                Icon(
-                                                    Icons.Default.DateRange,
-                                                    contentDescription = null,
-                                                    tint = LightSecondaryText,
-                                                    modifier = Modifier.size(16.dp)
-                                                )
-                                                
-                                                Spacer(modifier = Modifier.width(4.dp))
-                                                
-                                                val formatter = SimpleDateFormat("MMM dd, yyyy", Locale.getDefault())
-                                                Text(
-                                                    text = formatter.format(exam.examDate),
-                                                    style = MaterialTheme.typography.bodyMedium,
-                                                    color = LightSecondaryText
-                                                )
-                                            }
-                                            
-                                            if (exam.isEmergency) {
-                                                Spacer(modifier = Modifier.height(4.dp))
-                                                Text(
-                                                    text = "Emergency Exam",
-                                                    style = MaterialTheme.typography.bodySmall,
-                                                    color = ErrorColor
-                                                )
-                                            }
                                         }
                                     }
                                 }
@@ -595,9 +579,11 @@ fun HomeScreen(
                                     when {
                                         subjectName.isBlank() -> {
                                             // Show error
+                                            examViewModel.setError(stringResource(id = R.string.error_empty_fields))
                                         }
                                         examDate == null -> {
                                             // Show error
+                                            examViewModel.setError(stringResource(id = R.string.error_date_required))
                                         }
                                         else -> {
                                             // Create exam
