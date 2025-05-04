@@ -16,6 +16,9 @@ class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
     private val db = FirebaseFirestore.getInstance()
     
+    // Referencia directa a la colección users en Firestore
+    private val usersCollection = db.collection("users")
+    
     // UI state
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
@@ -70,7 +73,7 @@ class AuthViewModel : ViewModel() {
                     throw Exception("Failed to get user ID after registration")
                 }
                 
-                // Create user document in Firestore using user ID
+                // Create user document in Firestore
                 val userData = hashMapOf(
                     "apellidos" to "",
                     "curso" to "",
@@ -79,9 +82,18 @@ class AuthViewModel : ViewModel() {
                     "nombre" to ""
                 )
                 
-                Log.d(TAG, "Attempting to create Firestore document for user: $userId")
-                db.collection("users").document(userId).set(userData).await()
-                Log.d(TAG, "Firestore document created successfully")
+                try {
+                    Log.d(TAG, "Attempting to create Firestore document for user: $userId")
+                    usersCollection.document(userId).set(userData).await()
+                    Log.d(TAG, "Firestore document created successfully")
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error creating Firestore document", e)
+                    
+                    // Intento alternativo usando email como ID del documento
+                    Log.d(TAG, "Trying alternate approach with email as document ID")
+                    usersCollection.document(email).set(userData).await()
+                    Log.d(TAG, "Firestore document created successfully with email as ID")
+                }
                 
                 // Success is handled by the AuthStateListener
             } catch (e: Exception) {
