@@ -1,5 +1,6 @@
 package es.uc3m.android.samplex.viewmodel
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -8,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+
+private const val TAG = "AuthViewModel"
 
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
@@ -27,6 +30,7 @@ class AuthViewModel : ViewModel() {
         // Initialize authentication state
         auth.addAuthStateListener { firebaseAuth ->
             _isLoggedIn.value = firebaseAuth.currentUser != null
+            Log.d(TAG, "Auth state changed. User logged in: ${_isLoggedIn.value}")
         }
     }
     
@@ -35,10 +39,13 @@ class AuthViewModel : ViewModel() {
             try {
                 _isLoading.value = true
                 _authError.value = null
+                Log.d(TAG, "Attempting to sign in user: $email")
                 
                 auth.signInWithEmailAndPassword(email, password).await()
+                Log.d(TAG, "Sign in successful for user: $email")
                 // Success is handled by the AuthStateListener
             } catch (e: Exception) {
+                Log.e(TAG, "Error signing in", e)
                 _authError.value = e.message
             } finally {
                 _isLoading.value = false
@@ -52,10 +59,18 @@ class AuthViewModel : ViewModel() {
                 _isLoading.value = true
                 _authError.value = null
                 
+                Log.d(TAG, "Attempting to create authentication account for: $email")
                 // Create authentication account
                 val result = auth.createUserWithEmailAndPassword(email, password).await()
+                Log.d(TAG, "Authentication account created successfully")
                 
-                // Create user document in Firestore using email as ID
+                // Get the user ID from the result
+                val userId = result.user?.uid
+                if (userId == null) {
+                    throw Exception("Failed to get user ID after registration")
+                }
+                
+                // Create user document in Firestore using user ID
                 val userData = hashMapOf(
                     "apellidos" to "",
                     "curso" to "",
@@ -64,10 +79,13 @@ class AuthViewModel : ViewModel() {
                     "nombre" to ""
                 )
                 
-                db.collection("users").document(email).set(userData).await()
+                Log.d(TAG, "Attempting to create Firestore document for user: $userId")
+                db.collection("users").document(userId).set(userData).await()
+                Log.d(TAG, "Firestore document created successfully")
                 
                 // Success is handled by the AuthStateListener
             } catch (e: Exception) {
+                Log.e(TAG, "Error creating account", e)
                 _authError.value = e.message
             } finally {
                 _isLoading.value = false
@@ -76,6 +94,7 @@ class AuthViewModel : ViewModel() {
     }
     
     fun signOut() {
+        Log.d(TAG, "Signing out user")
         auth.signOut()
         // The state will be updated by the AuthStateListener
     }
