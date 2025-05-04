@@ -54,6 +54,7 @@ import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material3.HorizontalDivider
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,13 +71,6 @@ fun HomeScreen(
         )
     )
 
-    val cardBackground = Brush.linearGradient(
-        colors = listOf(
-            LightSurface,
-            LightSurface
-        )
-    )
-
     var showProfileMenu by remember { mutableStateOf(false) }
     var showExamForm by remember { mutableStateOf(false) }
     var showSettingsScreen by remember { mutableStateOf(false) }
@@ -87,9 +81,6 @@ fun HomeScreen(
     var showDatePicker by remember { mutableStateOf(false) }
     var isEmergencyExam by remember { mutableStateOf(false) }
     var pdfUri by remember { mutableStateOf<Uri?>(null) }
-    
-    // For date picker
-    val datePickerState = rememberDatePickerState()
     
     // View Model states
     val isLoading by examViewModel.isLoading.collectAsState()
@@ -208,7 +199,7 @@ fun HomeScreen(
                                         showSettingsScreen = true
                                     }
                                 )
-                                Divider(color = Color.Gray.copy(alpha = 0.3f))
+                                HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                                 DropdownMenuItem(
                                     text = {
                                         Text(
@@ -573,17 +564,21 @@ fun HomeScreen(
                             }
                         },
                         confirmButton = {
+                            // Extract string resources before using them in the onClick
+                            val emptyFieldsError = stringResource(id = R.string.error_empty_fields)
+                            val dateRequiredError = stringResource(id = R.string.error_date_required)
+                            
                             Button(
                                 onClick = {
                                     // Validate form
                                     when {
                                         subjectName.isBlank() -> {
                                             // Show error
-                                            examViewModel.setError(stringResource(id = R.string.error_empty_fields))
+                                            examViewModel.setError(emptyFieldsError)
                                         }
                                         examDate == null -> {
                                             // Show error
-                                            examViewModel.setError(stringResource(id = R.string.error_date_required))
+                                            examViewModel.setError(dateRequiredError)
                                         }
                                         else -> {
                                             // Create exam
@@ -630,41 +625,30 @@ fun HomeScreen(
                 
                 // Date Picker Dialog
                 if (showDatePicker) {
-                    // Use Material3 DatePickerDialog wrapper
+                    val dateDialogState = rememberDatePickerState()
+                    
                     DatePickerDialog(
                         onDismissRequest = { showDatePicker = false },
                         confirmButton = {
-                            Button(
-                                onClick = {
-                                    datePickerState.selectedDateMillis?.let {
-                                        val calendar = Calendar.getInstance()
-                                        calendar.timeInMillis = it
-                                        examDate = calendar.time
-                                    }
-                                    showDatePicker = false
-                                },
-                                colors = ButtonDefaults.buttonColors(
-                                    containerColor = BabyBlueDark,
-                                    contentColor = Color.White
-                                )
-                            ) {
+                            TextButton(onClick = {
+                                dateDialogState.selectedDateMillis?.let {
+                                    val calendar = Calendar.getInstance()
+                                    calendar.timeInMillis = it
+                                    examDate = calendar.time
+                                }
+                                showDatePicker = false
+                            }) {
                                 Text(stringResource(id = R.string.select_date))
                             }
                         },
                         dismissButton = {
-                            TextButton(
-                                onClick = { showDatePicker = false },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = BabyBlueDark
-                                )
-                            ) {
+                            TextButton(onClick = { showDatePicker = false }) {
                                 Text(stringResource(id = R.string.cancel))
                             }
                         }
                     ) {
-                        // DatePicker content passed as a lambda
                         DatePicker(
-                            state = datePickerState,
+                            state = dateDialogState,
                             colors = DatePickerDefaults.colors(
                                 selectedDayContainerColor = BabyBlueDark,
                                 todayContentColor = BabyBlueDark,

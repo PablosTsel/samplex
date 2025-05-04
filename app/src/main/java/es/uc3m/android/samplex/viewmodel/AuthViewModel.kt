@@ -78,7 +78,7 @@ class AuthViewModel : ViewModel() {
                     "apellidos" to "",
                     "curso" to "",
                     "email" to email,
-                    "examenes" to emptyList<String>(),
+                    "exams" to emptyList<String>(),
                     "nombre" to ""
                 )
                 

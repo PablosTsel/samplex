@@ -88,10 +88,10 @@ class UserViewModel : ViewModel() {
                     "curso" to curso
                 )
                 
-                // Keep examenes array if it exists
-                userData?.examenes?.let {
+                // Keep exams array if it exists
+                userData?.exams?.let {
                     if (it.isNotEmpty()) {
-                        updatedData["examenes"] = it
+                        updatedData["exams"] = it
                     }
                 }
                 
@@ -111,7 +111,7 @@ class UserViewModel : ViewModel() {
                     apellidos = apellidos,
                     curso = curso,
                     email = userData?.email ?: "",
-                    examenes = userData?.examenes ?: emptyList()
+                    exams = userData?.exams ?: emptyList()
                 )
                 
                 _updateSuccess.value = true

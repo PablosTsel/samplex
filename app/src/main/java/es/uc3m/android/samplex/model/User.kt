@@ -8,5 +8,5 @@ data class User(
     val apellidos: String = "",
     val curso: String = "",
     val email: String = "",
-    val examenes: List<String> = emptyList()
+    val exams: List<String> = emptyList()
 ) 
