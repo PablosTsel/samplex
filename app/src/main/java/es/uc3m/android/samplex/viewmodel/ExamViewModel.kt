@@ -1,5 +1,6 @@
 package es.uc3m.android.samplex.viewmodel
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
@@ -32,7 +33,7 @@ class ExamViewModel : ViewModel() {
         fetchUserExams()
     }
     
-    fun createExam(subjectName: String, examDate: Date, isEmergency: Boolean = false) {
+    fun createExam(subjectName: String, examDate: Date, isEmergency: Boolean = false, contentUri: Uri? = null) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
@@ -52,7 +53,8 @@ class ExamViewModel : ViewModel() {
                     examDate = examDate,
                     userId = currentUser.uid,
                     isEmergency = isEmergency,
-                    createdAt = Date()
+                    createdAt = Date(),
+                    contentUri = contentUri?.toString()
                 )
                 
                 // Add to Firestore
@@ -127,6 +129,7 @@ data class Exam(
     val userId: String = "",
     val isEmergency: Boolean = false,
     val createdAt: Date = Date(),
+    val contentUri: String? = null,
     val days: List<StudyDay> = emptyList()
 )
 

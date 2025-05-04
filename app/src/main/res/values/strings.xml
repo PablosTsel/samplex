@@ -21,11 +21,12 @@
     <string name="log_out">Log Out</string>
     <string name="previous_ongoing_exams">Previous/Ongoing Exams</string>
     <string name="add_new_exam">Add New Exam</string>
-    <string name="exam_form_title">Create an Exam Roadmap</string>
+    <string name="exam_form_title">Start your journey</string>
     <string name="subject_name">Subject Name</string>
     <string name="exam_date">Exam Date</string>
     <string name="upload_materials">Upload Study Materials</string>
-    <string name="emergency_exam">Emergency Exam Tomorrow</string>
+    <string name="emergency_exam">Emergency Exam</string>
+    <string name="attach_content">Attach content</string>
     <string name="create_roadmap">Create Roadmap</string>
     <string name="cancel">Cancel</string>
     <string name="select_date">Select Date</string>

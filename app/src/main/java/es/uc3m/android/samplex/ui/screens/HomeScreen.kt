@@ -1,5 +1,8 @@
 package es.uc3m.android.samplex.ui.screens
 
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
@@ -30,6 +33,7 @@ import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -82,6 +86,7 @@ fun HomeScreen(
     var showExamsDropdown by remember { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
     var isEmergencyExam by remember { mutableStateOf(false) }
+    var pdfUri by remember { mutableStateOf<Uri?>(null) }
     
     // For date picker
     val datePickerState = rememberDatePickerState()
@@ -217,6 +222,7 @@ fun HomeScreen(
                         subjectName = ""
                         examDate = null
                         isEmergencyExam = false
+                        pdfUri = null
                     },
                     containerColor = BabyBlueDark,
                     shape = CircleShape
@@ -492,6 +498,44 @@ fun HomeScreen(
                                 
                                 Spacer(modifier = Modifier.height(16.dp))
                                 
+                                // PDF Attachment
+                                val pdfPicker = rememberLauncherForActivityResult(
+                                    contract = ActivityResultContracts.GetContent()
+                                ) { uri: Uri? ->
+                                    uri?.let {
+                                        pdfUri = it
+                                    }
+                                }
+                                
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = pdfUri?.let { 
+                                            pdfUri.toString().substringAfterLast("/")
+                                        } ?: stringResource(id = R.string.attach_content),
+                                        modifier = Modifier.weight(1f),
+                                        color = LightText,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                    
+                                    IconButton(
+                                        onClick = { 
+                                            pdfPicker.launch("application/pdf") 
+                                        }
+                                    ) {
+                                        Icon(
+                                            Icons.Default.Add,
+                                            contentDescription = stringResource(id = R.string.attach_content),
+                                            tint = BabyBlueDark
+                                        )
+                                    }
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
                                 // Emergency Exam Toggle
                                 Row(
                                     verticalAlignment = Alignment.CenterVertically,
@@ -504,7 +548,20 @@ fun HomeScreen(
                                     )
                                     Switch(
                                         checked = isEmergencyExam,
-                                        onCheckedChange = { isEmergencyExam = it },
+                                        onCheckedChange = { 
+                                            isEmergencyExam = it
+                                            
+                                            // Set tomorrow's date if emergency toggle is on
+                                            if (it) {
+                                                val calendar = Calendar.getInstance()
+                                                calendar.add(Calendar.DAY_OF_YEAR, 1)
+                                                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                                                calendar.set(Calendar.MINUTE, 0)
+                                                calendar.set(Calendar.SECOND, 0)
+                                                calendar.set(Calendar.MILLISECOND, 0)
+                                                examDate = calendar.time
+                                            }
+                                        },
                                         colors = SwitchDefaults.colors(
                                             checkedThumbColor = Color.White,
                                             checkedTrackColor = BabyBlueDark,
@@ -547,7 +604,8 @@ fun HomeScreen(
                                             examViewModel.createExam(
                                                 subjectName = subjectName,
                                                 examDate = examDate!!,
-                                                isEmergency = isEmergencyExam
+                                                isEmergency = isEmergencyExam,
+                                                contentUri = pdfUri
                                             )
                                             showExamForm = false
                                         }
