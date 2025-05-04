@@ -3,6 +3,7 @@ package es.uc3m.android.samplex.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -10,6 +11,7 @@ import kotlinx.coroutines.tasks.await
 
 class AuthViewModel : ViewModel() {
     private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
     
     // UI state
     private val _isLoading = MutableStateFlow(false)
@@ -50,7 +52,20 @@ class AuthViewModel : ViewModel() {
                 _isLoading.value = true
                 _authError.value = null
                 
-                auth.createUserWithEmailAndPassword(email, password).await()
+                // Create authentication account
+                val result = auth.createUserWithEmailAndPassword(email, password).await()
+                
+                // Create user document in Firestore using email as ID
+                val userData = hashMapOf(
+                    "apellidos" to "",
+                    "curso" to "",
+                    "email" to email,
+                    "examenes" to emptyList<String>(),
+                    "nombre" to ""
+                )
+                
+                db.collection("users").document(email).set(userData).await()
+                
                 // Success is handled by the AuthStateListener
             } catch (e: Exception) {
                 _authError.value = e.message
