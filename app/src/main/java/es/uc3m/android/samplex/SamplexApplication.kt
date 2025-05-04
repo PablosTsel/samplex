@@ -15,6 +15,7 @@ class SamplexApplication : Application() {
         // Configurar Firestore
         val settings = FirebaseFirestoreSettings.Builder()
             .setPersistenceEnabled(true)  // Habilitar caché offline
+            .setDatabaseId("samplex")     // Especificar el nombre de la base de datos
             .build()
         
         FirebaseFirestore.getInstance().firestoreSettings = settings
