@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import es.uc3m.android.samplex.model.RoadmapDay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
@@ -13,6 +14,8 @@ import java.util.Date
 import java.util.UUID
 import java.text.SimpleDateFormat
 import java.util.Locale
+import android.util.Log
+import java.util.Calendar
 
 class ExamViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
@@ -34,6 +37,10 @@ class ExamViewModel : ViewModel() {
     // Current exam state for exam detail screen
     private val _currentExam = MutableStateFlow<Exam?>(null)
     val currentExam: StateFlow<Exam?> = _currentExam
+    
+    // Roadmap days for the current exam
+    private val _roadmapDays = MutableStateFlow<List<RoadmapDay>>(emptyList())
+    val roadmapDays: StateFlow<List<RoadmapDay>> = _roadmapDays
     
     // Last created exam ID
     private val _lastCreatedExamId = MutableStateFlow<String?>(null)
@@ -107,6 +114,7 @@ class ExamViewModel : ViewModel() {
             try {
                 _isLoading.value = true
                 _error.value = null
+                _roadmapDays.value = emptyList()
                 
                 val examDoc = db.collection("exams").document(examId).get().await()
                 if (!examDoc.exists()) {
@@ -115,7 +123,7 @@ class ExamViewModel : ViewModel() {
                     return@launch
                 }
                 
-                val content = examDoc.get("content") as? List<Any> ?: emptyList<Any>()
+                val content = examDoc.get("content") as? List<Map<String, Any>> ?: emptyList()
                 val subjectName = examDoc.getString("subjectName") ?: ""
                 val examDate = examDoc.getDate("examDate") ?: Date()
                 val userId = examDoc.getString("userId") ?: ""
@@ -137,6 +145,11 @@ class ExamViewModel : ViewModel() {
                 
                 _currentExam.value = exam
                 
+                // Parse roadmap days from content
+                if (content.isNotEmpty()) {
+                    parseRoadmapDays(content)
+                }
+                
             } catch (e: Exception) {
                 _error.value = e.message
             } finally {
@@ -145,8 +158,61 @@ class ExamViewModel : ViewModel() {
         }
     }
     
+    private fun parseRoadmapDays(content: List<Map<String, Any>>) {
+        try {
+            val days = content.mapNotNull { dayMap ->
+                try {
+                    // Handle fecha as either Date or String
+                    val fecha = when (val fechaValue = dayMap["fecha"]) {
+                        is Date -> fechaValue
+                        is String -> {
+                            // Try to parse the string date (e.g., "May 5")
+                            try {
+                                val sdf = SimpleDateFormat("MMM d", Locale.getDefault())
+                                // Set year to current year for proper comparison
+                                val calendar = Calendar.getInstance()
+                                val parsedDate = sdf.parse(fechaValue) ?: Date()
+                                val parsedCalendar = Calendar.getInstance()
+                                parsedCalendar.time = parsedDate
+                                
+                                // Keep the parsed month and day but use current year
+                                parsedCalendar.set(Calendar.YEAR, calendar.get(Calendar.YEAR))
+                                parsedCalendar.time
+                            } catch (e: Exception) {
+                                Log.e("ExamViewModel", "Error parsing date: ${e.message}")
+                                Date() // Fallback to current date if parsing fails
+                            }
+                        }
+                        else -> Date() // Default to current date
+                    }
+                    
+                    val descripcion = dayMap["descripcion"] as? String ?: ""
+                    val isFinal = dayMap["final"] as? Boolean ?: false
+                    val isCompleted = dayMap["completed"] as? Boolean ?: false
+                    val tasks = dayMap["tasks"] as? List<Map<String, Any>> ?: emptyList()
+                    
+                    RoadmapDay(
+                        fecha = fecha,
+                        descripcion = descripcion,
+                        final = isFinal,
+                        isCompleted = isCompleted,
+                        tasks = tasks
+                    )
+                } catch (e: Exception) {
+                    Log.e("ExamViewModel", "Error creating RoadmapDay: ${e.message}")
+                    null
+                }
+            }
+            
+            _roadmapDays.value = days
+        } catch (e: Exception) {
+            _error.value = "Error parsing roadmap: ${e.message}"
+        }
+    }
+    
     fun clearCurrentExam() {
         _currentExam.value = null
+        _roadmapDays.value = emptyList()
     }
     
     private fun fetchUserExams() {
@@ -210,7 +276,7 @@ data class Exam(
     val isEmergency: Boolean = false,
     val createdAt: Date = Date(),
     val contentUri: String? = null,
-    val content: List<Any> = emptyList(),
+    val content: List<Map<String, Any>> = emptyList(),
     val days: List<StudyDay> = emptyList()
 )
 

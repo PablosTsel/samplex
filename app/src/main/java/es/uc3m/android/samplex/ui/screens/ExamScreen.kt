@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import es.uc3m.android.samplex.R
+import es.uc3m.android.samplex.ui.components.RoadmapPath
 import es.uc3m.android.samplex.ui.theme.BabyBlue
 import es.uc3m.android.samplex.ui.theme.BabyBlueDark
 import es.uc3m.android.samplex.ui.theme.LightBackground
@@ -66,6 +67,7 @@ fun ExamScreen(
     val isLoading by examViewModel.isLoading.collectAsState()
     val error by examViewModel.error.collectAsState()
     val currentExam by examViewModel.currentExam.collectAsState()
+    val roadmapDays by examViewModel.roadmapDays.collectAsState()
     
     // Fetch exam data when screen is displayed
     LaunchedEffect(examId) {
@@ -161,6 +163,7 @@ fun ExamScreen(
                     
                     // Check if content array is empty
                     if (currentExam?.content?.isEmpty() == true) {
+                        // Show generating message for empty content
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -183,9 +186,9 @@ fun ExamScreen(
                                 )
                             }
                         }
-                    } else {
-                        // TODO: Display exam content when it's available
-                        // This will be implemented in the future as mentioned by the user
+                    } else if (roadmapDays.isNotEmpty()) {
+                        // Display roadmap
+                        RoadmapPath(days = roadmapDays)
                     }
                 }
             } else {
