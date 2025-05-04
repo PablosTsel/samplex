@@ -2,7 +2,6 @@ package es.uc3m.android.samplex.ui.screens
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -29,12 +28,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavController
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+import com.google.firebase.auth.GoogleAuthProvider
 import es.uc3m.android.samplex.R
 import es.uc3m.android.samplex.ui.theme.*
-import es.uc3m.android.samplex.utils.GoogleAuthUiClient
 import es.uc3m.android.samplex.viewmodel.AuthViewModel
 import kotlinx.coroutines.launch
-
+import com.google.android.gms.common.api.ApiException
 
 @Composable
 fun AuthScreen(
@@ -50,26 +51,22 @@ fun AuthScreen(
     val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
     val context = LocalContext.current
-    val googleAuthUiClient = remember { GoogleAuthUiClient(context) }
     val scope = rememberCoroutineScope()
 
-
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult()
+        contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val intent = result.data
-            intent?.let {
-                scope.launch {
-                    val user = googleAuthUiClient.signInWithIntent(it)
-                    user?.let {
-                        navController.navigate("home")
-                    }
-                }
+        val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+        try {
+            val account = task.getResult(ApiException::class.java)
+            account?.idToken?.let { idToken ->
+                val credential = GoogleAuthProvider.getCredential(idToken, null)
+                authViewModel.signInWithCredential(credential)
             }
+        } catch (e: ApiException) {
+            e.printStackTrace()
         }
     }
-
 
     LaunchedEffect(isLoggedIn) {
         if (isLoggedIn) {
@@ -289,14 +286,13 @@ fun AuthScreen(
 
                             OutlinedButton(
                                 onClick = {
-                                    scope.launch {
-                                        val intentSender = googleAuthUiClient.signIn()
-                                        intentSender?.let {
-                                            launcher.launch(
-                                                IntentSenderRequest.Builder(it).build()
-                                            )
-                                        }
-                                    }
+                                    val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                        .requestIdToken(context.getString(R.string.default_web_client_id))
+                                        .requestEmail()
+                                        .build()
+                                    val googleSignInClient = GoogleSignIn.getClient(context, gso)
+                                    val signInIntent = googleSignInClient.signInIntent
+                                    launcher.launch(signInIntent)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),

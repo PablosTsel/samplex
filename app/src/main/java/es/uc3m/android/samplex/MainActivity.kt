@@ -7,6 +7,8 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import es.uc3m.android.samplex.ui.screens.AuthScreen
 import es.uc3m.android.samplex.ui.screens.HomeScreen
@@ -27,14 +29,20 @@ class MainActivity : ComponentActivity() {
                 val userViewModel: UserViewModel = viewModel()
                 val isLoggedIn by authViewModel.isLoggedIn.collectAsState()
 
-                if (isLoggedIn) {
-                    userViewModel.fetchUserData()
-                    HomeScreen()
-                } else {
-                    AuthScreen(
-                        navController = navController,
-                        authViewModel = authViewModel
-                    )
+                NavHost(
+                    navController = navController,
+                    startDestination = if (isLoggedIn) "home" else "auth"
+                ) {
+                    composable("auth") {
+                        AuthScreen(
+                            navController = navController,
+                            authViewModel = authViewModel
+                        )
+                    }
+                    composable("home") {
+                        userViewModel.fetchUserData()
+                        HomeScreen()
+                    }
                 }
             }
         }

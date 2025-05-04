@@ -9,6 +9,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import com.google.firebase.auth.AuthCredential
+
 
 private const val TAG = "AuthViewModel"
 
@@ -110,4 +112,19 @@ class AuthViewModel : ViewModel() {
         auth.signOut()
         // The state will be updated by the AuthStateListener
     }
+
+    fun signInWithCredential(credential: AuthCredential) {
+        _isLoading.value = true
+        FirebaseAuth.getInstance().signInWithCredential(credential)
+            .addOnCompleteListener { task ->
+                _isLoading.value = false
+                if (task.isSuccessful) {
+                    _isLoggedIn.value = true
+                    _authError.value = null
+                } else {
+                    _authError.value = task.exception?.message
+                }
+            }
+    }
+
 } 

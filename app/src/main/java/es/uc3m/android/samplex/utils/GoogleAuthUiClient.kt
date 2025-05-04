@@ -23,7 +23,7 @@ class GoogleAuthUiClient(
                 .setFilterByAuthorizedAccounts(false)
                 .build()
         )
-        .setAutoSelectEnabled(true)
+        .setAutoSelectEnabled(false) // <- Esto fuerza el pop-up de selección de cuenta
         .build()
 
     suspend fun signIn(): IntentSender? {
