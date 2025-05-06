@@ -203,6 +203,7 @@ fun RoadmapPath(days: List<RoadmapDay>) {
     var selectedDay by remember { mutableStateOf<RoadmapDay?>(null) }
     var showActivitiesDialog by remember { mutableStateOf(false) }
     var reloadRequired by remember { mutableStateOf(false) }
+    var showCongratulationsDialog by remember { mutableStateOf(false) }
     
     // Initialize the viewModel at the Composable level
     val examViewModel: ExamViewModel = viewModel()
@@ -248,6 +249,15 @@ fun RoadmapPath(days: List<RoadmapDay>) {
         }
     }
     
+    // Show congratulations dialog if a final day was completed
+    if (showCongratulationsDialog) {
+        CongratulationsDialog(
+            onDismiss = {
+                showCongratulationsDialog = false
+            }
+        )
+    }
+    
     // Show dialog if a day is selected
     if (showActivitiesDialog && selectedDay != null) {
         DayActivitiesDialog(
@@ -256,12 +266,17 @@ fun RoadmapPath(days: List<RoadmapDay>) {
                 showActivitiesDialog = false
                 selectedDay = null
             },
-            onDayCompleted = {
+            onDayCompleted = { isFinalDay ->
                 // Set flag to reload data
                 reloadRequired = true
                 // Close dialog
                 showActivitiesDialog = false
                 selectedDay = null
+                
+                // Show congratulations if it was the final day
+                if (isFinalDay) {
+                    showCongratulationsDialog = true
+                }
             }
         )
     }
@@ -271,7 +286,7 @@ fun RoadmapPath(days: List<RoadmapDay>) {
 fun DayActivitiesDialog(
     day: RoadmapDay,
     onDismiss: () -> Unit,
-    onDayCompleted: () -> Unit
+    onDayCompleted: (Boolean) -> Unit
 ) {
     val activities = day.actividades
     var showIntro by remember { mutableStateOf(true) }
@@ -469,7 +484,7 @@ fun DayActivitiesDialog(
                                                         }
                                                     }
                                             }
-                                            onDayCompleted()
+                                            onDayCompleted(day.final)
                                         },
                                         enabled = canNavigateNext
                                     ) {
@@ -860,10 +875,10 @@ fun QuestionActivity(
             .verticalScroll(scrollState)
             .padding(bottom = 16.dp)
     ) {
+        // Use normal text style for question instead of headline
         Text(
             text = question,
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.bodyLarge,
             modifier = Modifier.padding(bottom = 16.dp)
         )
         
@@ -956,6 +971,52 @@ fun QuestionActivity(
                 enabled = answer.isNotEmpty()
             ) {
                 Text("Submit")
+            }
+        }
+    }
+}
+
+@Composable
+fun CongratulationsDialog(
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = Color.White
+            ),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text(
+                    text = "Congratulations!",
+                    style = MaterialTheme.typography.headlineMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF4CAF50), // Green color
+                    modifier = Modifier.padding(bottom = 16.dp)
+                )
+                
+                Text(
+                    text = "You have completed the study plan! Good luck in your exam, if you need any extra study, please look again at the past tasks.",
+                    style = MaterialTheme.typography.bodyLarge,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(bottom = 24.dp)
+                )
+                
+                Button(
+                    onClick = onDismiss,
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("Close")
+                }
             }
         }
     }
