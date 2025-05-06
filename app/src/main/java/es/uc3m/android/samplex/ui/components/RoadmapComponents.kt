@@ -86,6 +86,13 @@ fun RoadmapDayNode(
         else -> DayBlueColor               // Future/incomplete days are blue
     }
     
+    // For final days, we'll keep the star shape but still respect the color priority
+    val finalDayColor = if (day.isCompleted) {
+        DayGreenColor  // Final completed days are still green
+    } else {
+        StarYellowColor // Final non-completed days keep the yellow color
+    }
+    
     // Check if the day is clickable (past days or today)
     val isClickable = day.isCompleted || day.isToday() || day.isPast()
     
@@ -108,7 +115,7 @@ fun RoadmapDayNode(
                     modifier = Modifier
                         .size(130.dp)
                         .clip(StarShape(5, 0.5f))
-                        .background(StarYellowColor) // Always yellow for final day
+                        .background(finalDayColor) // Use conditional color for final days
                         .let { mod ->
                             if (isClickable) {
                                 mod.clickable { onDayClick(day) }
