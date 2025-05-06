@@ -39,6 +39,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -212,6 +213,12 @@ fun RoadmapPath(days: List<RoadmapDay>) {
     var reloadRequired by remember { mutableStateOf(false) }
     var showCongratulationsDialog by remember { mutableStateOf(false) }
     
+    // Use rememberUpdatedState to force recomposition when the days list changes
+    val currentDays by rememberUpdatedState(days)
+    
+    // Keep track of last completed day for forcing updates
+    var lastCompletedDayIndex by remember { mutableStateOf(-1) }
+    
     // Initialize the viewModel at the Composable level
     val examViewModel: ExamViewModel = viewModel()
     
@@ -220,7 +227,27 @@ fun RoadmapPath(days: List<RoadmapDay>) {
         if (reloadRequired) {
             // Fetch updated data using the viewModel initialized above
             selectedDay?.examId?.let { examId ->
-                examViewModel.fetchExamById(examId)
+                // Make a direct Firestore query to get the latest data immediately
+                val db = FirebaseFirestore.getInstance()
+                try {
+                    val snapshot = db.collection("exams").document(examId).get().await()
+                    if (snapshot.exists()) {
+                        // Update the last completed day in the current list to show as completed
+                        if (lastCompletedDayIndex >= 0 && lastCompletedDayIndex < currentDays.size) {
+                            val updatedDay = currentDays[lastCompletedDayIndex].copy(isCompleted = true)
+                            val mutableDays = currentDays.toMutableList()
+                            mutableDays[lastCompletedDayIndex] = updatedDay
+                            // This triggers the view model to update its internal state
+                            examViewModel.updateRoadmapDaysManually(mutableDays)
+                        }
+                        // Also fetch from the server to ensure everything is in sync
+                        examViewModel.fetchExamById(examId)
+                    }
+                } catch (e: Exception) {
+                    Log.e("RoadmapPath", "Error fetching updated exam data: ${e.message}")
+                    // Fall back to regular fetch
+                    examViewModel.fetchExamById(examId)
+                }
             }
             reloadRequired = false
         }
@@ -231,7 +258,7 @@ fun RoadmapPath(days: List<RoadmapDay>) {
             .fillMaxWidth()
             .padding(16.dp)
     ) {
-        days.forEachIndexed { index, day ->
+        currentDays.forEachIndexed { index, day ->
             // Render day node
             RoadmapDayNode(
                 day = day,
@@ -244,7 +271,7 @@ fun RoadmapPath(days: List<RoadmapDay>) {
             )
             
             // Render connecting path (except for the last day)
-            if (index < days.size - 1) {
+            if (index < currentDays.size - 1) {
                 // A path is considered "past" if the current day is completed
                 val isPastConnection = day.isCompleted
                 
@@ -267,15 +294,22 @@ fun RoadmapPath(days: List<RoadmapDay>) {
     
     // Show dialog if a day is selected
     if (showActivitiesDialog && selectedDay != null) {
+        val currentSelectedDay = selectedDay!!
+        val dayIndex = currentDays.indexOf(currentSelectedDay)
+        
         DayActivitiesDialog(
-            day = selectedDay!!,
+            day = currentSelectedDay,
             onDismiss = { 
                 showActivitiesDialog = false
                 selectedDay = null
             },
             onDayCompleted = { isFinalDay ->
+                // Store the index of the day that was just completed
+                lastCompletedDayIndex = dayIndex
+                
                 // Set flag to reload data
                 reloadRequired = true
+                
                 // Close dialog
                 showActivitiesDialog = false
                 selectedDay = null
@@ -472,8 +506,12 @@ fun DayActivitiesDialog(
                                         onClick = {
                                             // If not completed, mark day as completed in Firestore
                                             if (!day.isCompleted && day.examId.isNotEmpty()) {
-                                                db.collection("exams")
-                                                    .document(day.examId)
+                                                // First create a local copy with the completed flag set to true
+                                                // This allows the UI to update immediately
+                                                val updatedDay = day.copy(isCompleted = true)
+                                                
+                                                // Then update the database
+                                                db.collection("exams").document(day.examId)
                                                     .get()
                                                     .addOnSuccessListener { document ->
                                                         if (document != null && document.exists()) {
@@ -484,13 +522,16 @@ fun DayActivitiesDialog(
                                                                 dayMap["completed"] = true
                                                                 updatedContent[day.dayIndex] = dayMap
                                                                 
-                                                                db.collection("exams")
-                                                                    .document(day.examId)
+                                                                db.collection("exams").document(day.examId)
                                                                     .update("content", updatedContent)
+                                                                    .addOnSuccessListener {
+                                                                        Log.d("DayActivitiesDialog", "Day marked as completed successfully")
+                                                                    }
                                                             }
                                                         }
                                                     }
                                             }
+                                            // Notify completion and pass the final status
                                             onDayCompleted(day.final)
                                         },
                                         enabled = canNavigateNext

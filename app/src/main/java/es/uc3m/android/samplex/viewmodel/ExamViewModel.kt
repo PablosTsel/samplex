@@ -357,6 +357,11 @@ class ExamViewModel : ViewModel() {
     fun clearLastCreatedExamId() {
         _lastCreatedExamId.value = null
     }
+    
+    // Add new function to manually update roadmap days for immediate UI updates
+    fun updateRoadmapDaysManually(updatedDays: List<RoadmapDay>) {
+        _roadmapDays.value = updatedDays
+    }
 }
 
 // Data class to represent an Exam
