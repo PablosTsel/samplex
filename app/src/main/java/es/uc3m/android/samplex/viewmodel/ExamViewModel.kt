@@ -324,18 +324,54 @@ class ExamViewModel : ViewModel() {
                     return@launch
                 }
                 
-                // Convert exam entries to Exam objects
-                val examsList = examEntries.map { entry ->
-                    Exam(
-                        id = entry["id"] as String,
-                        displayName = entry["name"] as String
-                    )
+                // Fetch complete exam data for each exam
+                val examsList = mutableListOf<Exam>()
+                
+                for (entry in examEntries) {
+                    val examId = entry["id"] as String
+                    try {
+                        // Get complete exam details from the exams collection
+                        val examDoc = db.collection("exams").document(examId).get().await()
+                        if (examDoc.exists()) {
+                            val examDate = examDoc.getDate("examDate") ?: Date()
+                            val subjectName = examDoc.getString("subjectName") ?: ""
+                            val isEmergency = examDoc.getBoolean("isEmergency") ?: false
+                            
+                            examsList.add(
+                                Exam(
+                                    id = examId,
+                                    displayName = entry["name"] as String,
+                                    subjectName = subjectName,
+                                    examDate = examDate,
+                                    isEmergency = isEmergency
+                                )
+                            )
+                        } else {
+                            // If the exam document doesn't exist, just add the basic info
+                            examsList.add(
+                                Exam(
+                                    id = examId,
+                                    displayName = entry["name"] as String
+                                )
+                            )
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ExamViewModel", "Error fetching exam details: ${e.message}")
+                        // If there's an error, add the basic info
+                        examsList.add(
+                            Exam(
+                                id = examId,
+                                displayName = entry["name"] as String
+                            )
+                        )
+                    }
                 }
                 
                 _exams.value = examsList
                 
             } catch (e: Exception) {
                 _error.value = e.message
+                Log.e("ExamViewModel", "Error fetching exams: ${e.message}")
             } finally {
                 _isLoading.value = false
             }

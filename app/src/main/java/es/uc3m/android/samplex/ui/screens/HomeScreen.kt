@@ -12,25 +12,35 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,6 +66,7 @@ import java.util.Date
 import java.util.Locale
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalContext
+import kotlin.random.Random
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -71,10 +82,46 @@ fun HomeScreen(
             Color.White
         )
     )
+    
+    // Motivational quotes
+    val motivationalQuotes = listOf(
+        "Study hard what interests you the most. That is where you will excel.",
+        "The expert in anything was once a beginner.",
+        "Success is the sum of small efforts, repeated day in and day out.",
+        "The beautiful thing about learning is that no one can take it away from you.",
+        "Education is the passport to the future, for tomorrow belongs to those who prepare for it today.",
+        "The more that you read, the more things you will know. The more that you learn, the more places you'll go.",
+        "The only way to do great work is to love what you do."
+    )
+    
+    // Get today's date to select a quote
+    val mainCalendar = Calendar.getInstance()
+    val dayOfYear = mainCalendar.get(Calendar.DAY_OF_YEAR)
+    val quoteIndex = dayOfYear % motivationalQuotes.size
+    val todayQuote = motivationalQuotes[quoteIndex]
+    
+    // Simulated streak (in a real app, this would come from a data store)
+    val studyStreak = remember { mutableIntStateOf(5) }
+    
+    // Generate days for the weekly calendar
+    val weekCalendar = remember {
+        val currentCalendar = Calendar.getInstance()
+        val today = currentCalendar.get(Calendar.DAY_OF_WEEK)
+        val days = mutableListOf<Pair<String, Date>>()
+        
+        // Adjust to start from Sunday if needed
+        currentCalendar.add(Calendar.DAY_OF_WEEK, -today + 1)
+        
+        for (i in 0 until 7) {
+            val dayName = SimpleDateFormat("EEE", Locale.getDefault()).format(currentCalendar.time)
+            days.add(Pair(dayName, currentCalendar.time))
+            currentCalendar.add(Calendar.DAY_OF_WEEK, 1)
+        }
+        days
+    }
 
     var showProfileMenu by remember { mutableStateOf(false) }
     var showExamForm by remember { mutableStateOf(false) }
-    var showSettingsScreen by remember { mutableStateOf(false) }
     var showAccountScreen by remember { mutableStateOf(false) }
     var showExamScreen by remember { mutableStateOf(false) }
     var selectedExamId by remember { mutableStateOf("") }
@@ -112,11 +159,7 @@ fun HomeScreen(
         label = "dropdownRotation"
     )
 
-    if (showSettingsScreen) {
-        SettingsScreen(
-            onBackClick = { showSettingsScreen = false }
-        )
-    } else if (showAccountScreen) {
+    if (showAccountScreen) {
         AccountScreen(
             onBackClick = { showAccountScreen = false }
         )
@@ -202,18 +245,6 @@ fun HomeScreen(
                                         showAccountScreen = true
                                     }
                                 )
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            text = stringResource(id = R.string.settings),
-                                            color = LightText
-                                        )
-                                    },
-                                    onClick = {
-                                        showProfileMenu = false
-                                        showSettingsScreen = true
-                                    }
-                                )
                                 HorizontalDivider(color = Color.Gray.copy(alpha = 0.3f))
                                 DropdownMenuItem(
                                     text = {
@@ -258,133 +289,348 @@ fun HomeScreen(
                     .background(brush = backgroundGradient)
                     .padding(paddingValues)
             ) {
-                Column(
+                LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp)
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
-                    // Welcome message
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .shadow(4.dp, RoundedCornerShape(16.dp)),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = LightSurface)
-                    ) {
-                        Box(
+                    // Motivational Quote Card
+                    item {
+                        Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(16.dp)
+                                .padding(vertical = 8.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = BabyBlueDark.copy(alpha = 0.1f)
+                            )
                         ) {
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalAlignment = Alignment.CenterHorizontally
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = stringResource(id = R.string.welcome_title),
-                                    style = MaterialTheme.typography.headlineSmall.copy(
-                                        fontWeight = FontWeight.Light
-                                    ),
-                                    color = LightText,
-                                    textAlign = TextAlign.Center
+                                Icon(
+                                    imageVector = Icons.Default.Star,
+                                    contentDescription = null,
+                                    tint = BabyBlueDark,
+                                    modifier = Modifier
+                                        .size(40.dp)
+                                        .padding(end = 8.dp)
                                 )
                                 
-                                Spacer(modifier = Modifier.height(8.dp))
-                                
                                 Text(
-                                    text = "",
+                                    text = todayQuote,
                                     style = MaterialTheme.typography.bodyLarge,
-                                    color = LightSecondaryText,
-                                    textAlign = TextAlign.Center
+                                    fontStyle = FontStyle.Italic,
+                                    color = LightText,
+                                    modifier = Modifier.padding(horizontal = 8.dp)
                                 )
                             }
                         }
                     }
                     
-                    Spacer(modifier = Modifier.height(24.dp))
+                    // Weekly Calendar View
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = LightSurface
+                            )
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        tint = BabyBlueDark,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    
+                                    Text(
+                                        text = "This Week",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = LightText
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.height(16.dp))
+                                
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    val today = Calendar.getInstance().time
+                                    val dateFormat = SimpleDateFormat("dd", Locale.getDefault())
+                                    
+                                    weekCalendar.forEach { (dayName, date) ->
+                                        val isToday = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(date) == 
+                                                      SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(today)
+                                        
+                                        // Check if this date has any exams
+                                        val hasExam = exams.any { exam -> 
+                                            val examCal = Calendar.getInstance().apply {
+                                                time = exam.examDate
+                                                set(Calendar.HOUR_OF_DAY, 0)
+                                                set(Calendar.MINUTE, 0)
+                                                set(Calendar.SECOND, 0)
+                                                set(Calendar.MILLISECOND, 0)
+                                            }
+                                            
+                                            val dateCal = Calendar.getInstance().apply {
+                                                time = date
+                                                set(Calendar.HOUR_OF_DAY, 0)
+                                                set(Calendar.MINUTE, 0)
+                                                set(Calendar.SECOND, 0)
+                                                set(Calendar.MILLISECOND, 0)
+                                            }
+                                            
+                                            examCal.get(Calendar.YEAR) == dateCal.get(Calendar.YEAR) &&
+                                            examCal.get(Calendar.MONTH) == dateCal.get(Calendar.MONTH) &&
+                                            examCal.get(Calendar.DAY_OF_MONTH) == dateCal.get(Calendar.DAY_OF_MONTH)
+                                        }
+                                        
+                                        Column(
+                                            horizontalAlignment = Alignment.CenterHorizontally
+                                        ) {
+                                            Text(
+                                                text = dayName,
+                                                color = if (isToday) BabyBlueDark else LightSecondaryText,
+                                                fontSize = 12.sp
+                                            )
+                                            
+                                            Box(
+                                                modifier = Modifier
+                                                    .padding(vertical = 4.dp)
+                                                    .size(36.dp)
+                                                    .background(
+                                                        color = if (isToday) BabyBlueDark else Color.Transparent,
+                                                        shape = CircleShape
+                                                    ),
+                                                contentAlignment = Alignment.Center
+                                            ) {
+                                                Text(
+                                                    text = dateFormat.format(date),
+                                                    color = if (isToday) Color.White else LightText,
+                                                    fontWeight = if (isToday) FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            }
+                                            
+                                            // Show a dot indicator if there's an exam on this day
+                                            if (hasExam) {
+                                                Box(
+                                                    modifier = Modifier
+                                                        .size(8.dp)
+                                                        .background(
+                                                            color = Color.Red.copy(alpha = 0.7f),
+                                                            shape = CircleShape
+                                                        )
+                                                )
+                                            } else {
+                                                Spacer(modifier = Modifier.height(8.dp))
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                     
-                    // Exams section title with dropdown
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    // Streak Counter
+                    item {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = LightSurface
+                            )
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Favorite,
+                                    contentDescription = null,
+                                    tint = BabyBlueDark,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                                
+                                Spacer(modifier = Modifier.width(16.dp))
+                                
+                                Column {
+                                    Text(
+                                        text = "${studyStreak.intValue} Day Streak",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Bold,
+                                        color = LightText
+                                    )
+                                    
+                                    Text(
+                                        text = "Keep it up! You're doing great!",
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        color = LightSecondaryText
+                                    )
+                                }
+                                
+                                Spacer(modifier = Modifier.weight(1f))
+                                
+                                IconButton(
+                                    onClick = { studyStreak.intValue++ },
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .background(BabyBlueDark)
+                                        .size(40.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Check,
+                                        contentDescription = "Mark today complete",
+                                        tint = Color.White
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Exams section title
+                    item {
                         Text(
                             text = stringResource(id = R.string.previous_ongoing_exams),
                             style = MaterialTheme.typography.titleMedium,
                             color = LightText,
-                            modifier = Modifier.weight(1f)
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp, horizontal = 4.dp)
                         )
-                        
-                        IconButton(
-                            onClick = { showExamsDropdown = !showExamsDropdown }
-                        ) {
-                            Icon(
-                                Icons.Default.ArrowDropDown,
-                                contentDescription = stringResource(id = R.string.menu),
-                                tint = BabyBlueDark,
-                                modifier = Modifier.rotate(dropdownRotation)
-                            )
-                        }
                     }
                     
-                    // Exams list (expandable)
-                    AnimatedVisibility(
-                        visible = showExamsDropdown,
-                        enter = fadeIn() + expandVertically(),
-                        exit = fadeOut() + shrinkVertically()
-                    ) {
-                        if (exams.isEmpty()) {
+                    // Exams list
+                    if (exams.isEmpty()) {
+                        item {
+                            // Enhanced empty state
                             Card(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .padding(vertical = 8.dp, horizontal = 4.dp),
                                 shape = RoundedCornerShape(12.dp),
                                 colors = CardDefaults.cardColors(
-                                    containerColor = Color.LightGray.copy(alpha = 0.3f)
-                                )
+                                    containerColor = Color.LightGray.copy(alpha = 0.1f)
+                                ),
+                                border = BorderStroke(1.dp, Color.LightGray.copy(alpha = 0.3f))
                             ) {
-                                Box(
+                                Column(
                                     modifier = Modifier
                                         .fillMaxWidth()
-                                        .padding(16.dp),
-                                    contentAlignment = Alignment.Center
+                                        .padding(24.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    verticalArrangement = Arrangement.Center
                                 ) {
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        modifier = Modifier.size(48.dp),
+                                        tint = BabyBlueDark.copy(alpha = 0.6f)
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    
                                     Text(
-                                        text = "No exams yet. Create your first exam roadmap!",
+                                        text = "No exams yet",
+                                        style = MaterialTheme.typography.titleMedium,
+                                        fontWeight = FontWeight.Medium,
+                                        color = LightText
+                                    )
+                                    
+                                    Spacer(modifier = Modifier.height(8.dp))
+                                    
+                                    Text(
+                                        text = "Create your first exam roadmap using the + button",
+                                        textAlign = TextAlign.Center,
                                         color = LightSecondaryText
                                     )
                                 }
                             }
-                        } else {
-                            Column {
-                                exams.forEach { exam ->
-                                    Card(
+                        }
+                    } else {
+                        items(exams) { exam ->
+                            Card(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp, horizontal = 4.dp),
+                                shape = RoundedCornerShape(12.dp),
+                                colors = CardDefaults.cardColors(
+                                    containerColor = Color.White
+                                ),
+                                elevation = CardDefaults.cardElevation(2.dp),
+                                onClick = {
+                                    selectedExamId = exam.id
+                                    showExamScreen = true
+                                }
+                            ) {
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(16.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    // Circular icon with first letter
+                                    Box(
                                         modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 8.dp, horizontal = 4.dp),
-                                        shape = RoundedCornerShape(12.dp),
-                                        colors = CardDefaults.cardColors(
-                                            containerColor = Color.LightGray.copy(alpha = 0.3f)
-                                        ),
-                                        onClick = {
-                                            selectedExamId = exam.id
-                                            showExamScreen = true
-                                        }
+                                            .size(50.dp)
+                                            .background(BabyBlueDark, CircleShape),
+                                        contentAlignment = Alignment.Center
                                     ) {
-                                        Box(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .padding(16.dp)
-                                        ) {
-                                            Text(
-                                                text = exam.displayName,
-                                                style = MaterialTheme.typography.titleMedium,
-                                                color = LightText
-                                            )
-                                        }
+                                        Text(
+                                            text = exam.displayName.take(1).uppercase(),
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 22.sp
+                                        )
                                     }
+                                    
+                                    Spacer(modifier = Modifier.width(16.dp))
+                                    
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = exam.displayName,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            color = Color.DarkGray,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                        
+                                        Text(
+                                            text = "Tap to view roadmap",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = LightSecondaryText
+                                        )
+                                    }
+                                    
+                                    Icon(
+                                        imageVector = Icons.Default.DateRange,
+                                        contentDescription = null,
+                                        tint = BabyBlueDark
+                                    )
                                 }
                             }
                         }

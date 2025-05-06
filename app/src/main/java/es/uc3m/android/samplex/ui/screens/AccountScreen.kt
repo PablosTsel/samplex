@@ -13,13 +13,17 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -57,6 +61,7 @@ import es.uc3m.android.samplex.ui.theme.LightBackground
 import es.uc3m.android.samplex.ui.theme.LightSurface
 import es.uc3m.android.samplex.ui.theme.LightText
 import es.uc3m.android.samplex.ui.theme.LightSecondaryText
+import es.uc3m.android.samplex.ui.theme.SuccessColor
 import es.uc3m.android.samplex.viewmodel.UserViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -69,8 +74,9 @@ fun AccountScreen(
     val userData by userViewModel.userData.collectAsState()
     val isLoading by userViewModel.isLoading.collectAsState()
     val error by userViewModel.error.collectAsState()
+    val updateSuccess by userViewModel.updateSuccess.collectAsState()
     
-    // UI state for read-only values
+    // UI state for editable values
     var nombre by remember { mutableStateOf("") }
     var apellidos by remember { mutableStateOf("") }
     var curso by remember { mutableStateOf("") }
@@ -89,6 +95,14 @@ fun AccountScreen(
     // Refresh user data when entering screen
     LaunchedEffect(Unit) {
         userViewModel.fetchUserData()
+    }
+    
+    // Auto-hide success message after a delay
+    LaunchedEffect(updateSuccess) {
+        if (updateSuccess) {
+            kotlinx.coroutines.delay(3000)
+            userViewModel.resetUpdateSuccess()
+        }
     }
     
     // UI color schemes
@@ -168,10 +182,10 @@ fun AccountScreen(
                             
                             Spacer(modifier = Modifier.height(24.dp))
                             
-                            // User information fields - all read-only
+                            // User information fields - now editable
                             OutlinedTextField(
                                 value = nombre,
-                                onValueChange = { /* Read-only, no changes allowed */ },
+                                onValueChange = { nombre = it },
                                 label = { 
                                     Text(
                                         text = stringResource(id = R.string.name),
@@ -179,16 +193,15 @@ fun AccountScreen(
                                     ) 
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = LightText,
                                     unfocusedTextColor = LightText,
-                                    disabledTextColor = LightText,
+                                    disabledTextColor = LightSecondaryText,
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     cursorColor = BabyBlueDark,
-                                    focusedBorderColor = BabyBlue.copy(alpha = 0.5f),
+                                    focusedBorderColor = BabyBlueDark,
                                     unfocusedBorderColor = BabyBlue.copy(alpha = 0.5f),
                                     disabledBorderColor = BabyBlue.copy(alpha = 0.3f)
                                 )
@@ -198,7 +211,7 @@ fun AccountScreen(
                             
                             OutlinedTextField(
                                 value = apellidos,
-                                onValueChange = { /* Read-only, no changes allowed */ },
+                                onValueChange = { apellidos = it },
                                 label = { 
                                     Text(
                                         text = stringResource(id = R.string.surname),
@@ -206,16 +219,15 @@ fun AccountScreen(
                                     ) 
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = LightText,
                                     unfocusedTextColor = LightText,
-                                    disabledTextColor = LightText,
+                                    disabledTextColor = LightSecondaryText,
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     cursorColor = BabyBlueDark,
-                                    focusedBorderColor = BabyBlue.copy(alpha = 0.5f),
+                                    focusedBorderColor = BabyBlueDark,
                                     unfocusedBorderColor = BabyBlue.copy(alpha = 0.5f),
                                     disabledBorderColor = BabyBlue.copy(alpha = 0.3f)
                                 )
@@ -225,7 +237,7 @@ fun AccountScreen(
                             
                             OutlinedTextField(
                                 value = curso,
-                                onValueChange = { /* Read-only, no changes allowed */ },
+                                onValueChange = { curso = it },
                                 label = { 
                                     Text(
                                         text = stringResource(id = R.string.course),
@@ -233,16 +245,15 @@ fun AccountScreen(
                                     ) 
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                readOnly = true,
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedTextColor = LightText,
                                     unfocusedTextColor = LightText,
-                                    disabledTextColor = LightText,
+                                    disabledTextColor = LightSecondaryText,
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     cursorColor = BabyBlueDark,
-                                    focusedBorderColor = BabyBlue.copy(alpha = 0.5f),
+                                    focusedBorderColor = BabyBlueDark,
                                     unfocusedBorderColor = BabyBlue.copy(alpha = 0.5f),
                                     disabledBorderColor = BabyBlue.copy(alpha = 0.3f)
                                 )
@@ -250,9 +261,10 @@ fun AccountScreen(
                             
                             Spacer(modifier = Modifier.height(16.dp))
                             
+                            // Email field - always read-only since it's tied to authentication
                             OutlinedTextField(
                                 value = email,
-                                onValueChange = { /* Read-only, no changes allowed */ },
+                                onValueChange = { /* Read-only */ },
                                 label = { 
                                     Text(
                                         text = stringResource(id = R.string.email),
@@ -262,44 +274,82 @@ fun AccountScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 readOnly = true,
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedTextColor = LightText,
-                                    unfocusedTextColor = LightText,
-                                    disabledTextColor = LightText,
+                                    focusedTextColor = LightSecondaryText,
+                                    unfocusedTextColor = LightSecondaryText,
+                                    disabledTextColor = LightSecondaryText,
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent,
                                     disabledContainerColor = Color.Transparent,
                                     cursorColor = BabyBlueDark,
-                                    focusedBorderColor = BabyBlue.copy(alpha = 0.5f),
-                                    unfocusedBorderColor = BabyBlue.copy(alpha = 0.5f),
+                                    focusedBorderColor = BabyBlue.copy(alpha = 0.3f),
+                                    unfocusedBorderColor = BabyBlue.copy(alpha = 0.3f),
                                     disabledBorderColor = BabyBlue.copy(alpha = 0.3f)
                                 )
                             )
+                            
+                            Spacer(modifier = Modifier.height(24.dp))
+                            
+                            // Save changes button
+                            Button(
+                                onClick = {
+                                    userViewModel.updateUserProfile(nombre, apellidos, curso)
+                                },
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = BabyBlueDark,
+                                    contentColor = Color.White
+                                ),
+                                shape = RoundedCornerShape(8.dp),
+                                enabled = !isLoading
+                            ) {
+                                if (isLoading) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(24.dp),
+                                        color = Color.White,
+                                        strokeWidth = 2.dp
+                                    )
+                                } else {
+                                    Text(
+                                        text = stringResource(id = R.string.save_changes),
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
+                                }
+                            }
+                            
+                            Spacer(modifier = Modifier.height(16.dp))
+                            
+                            // Success message
+                            AnimatedVisibility(
+                                visible = updateSuccess,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                Text(
+                                    text = stringResource(id = R.string.profile_updated),
+                                    color = SuccessColor,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
+                            
+                            // Error message
+                            AnimatedVisibility(
+                                visible = error != null,
+                                enter = fadeIn() + expandVertically(),
+                                exit = fadeOut() + shrinkVertically()
+                            ) {
+                                Text(
+                                    text = error ?: "",
+                                    color = ErrorColor,
+                                    style = MaterialTheme.typography.bodyMedium.copy(
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                )
+                            }
                         }
-                    }
-                }
-                
-                Spacer(modifier = Modifier.height(16.dp))
-                
-                // Error message
-                AnimatedVisibility(
-                    visible = error != null,
-                    enter = fadeIn() + expandVertically(),
-                    exit = fadeOut() + shrinkVertically()
-                ) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = ErrorColor.copy(alpha = 0.8f)
-                        )
-                    ) {
-                        Text(
-                            text = error ?: "",
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(16.dp),
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
                     }
                 }
             }
