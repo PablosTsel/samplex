@@ -52,11 +52,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import es.uc3m.android.samplex.model.RoadmapDay
 import es.uc3m.android.samplex.ui.theme.BabyBlueDark
 import es.uc3m.android.samplex.ui.components.StarShape
+import es.uc3m.android.samplex.viewmodel.ExamViewModel
 import kotlinx.coroutines.tasks.await
 
 // Colors
@@ -199,6 +201,19 @@ fun ConnectingPath(
 fun RoadmapPath(days: List<RoadmapDay>) {
     var selectedDay by remember { mutableStateOf<RoadmapDay?>(null) }
     var showActivitiesDialog by remember { mutableStateOf(false) }
+    var reloadRequired by remember { mutableStateOf(false) }
+    
+    // Handle reload after completion
+    LaunchedEffect(reloadRequired) {
+        if (reloadRequired) {
+            // Fetch updated data - this should trigger a recomposition with updated day status
+            val examViewModel: ExamViewModel = viewModel()
+            selectedDay?.examId?.let { examId ->
+                examViewModel.fetchExamById(examId)
+            }
+            reloadRequired = false
+        }
+    }
     
     Column(
         modifier = Modifier
@@ -237,6 +252,13 @@ fun RoadmapPath(days: List<RoadmapDay>) {
             onDismiss = { 
                 showActivitiesDialog = false
                 selectedDay = null
+            },
+            onDayCompleted = {
+                // Set flag to reload data
+                reloadRequired = true
+                // Close dialog
+                showActivitiesDialog = false
+                selectedDay = null
             }
         )
     }
@@ -245,7 +267,8 @@ fun RoadmapPath(days: List<RoadmapDay>) {
 @Composable
 fun DayActivitiesDialog(
     day: RoadmapDay,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    onDayCompleted: () -> Unit
 ) {
     val activities = day.actividades
     var showIntro by remember { mutableStateOf(true) }
@@ -425,7 +448,7 @@ fun DayActivitiesDialog(
                                                         }
                                                     }
                                             }
-                                            onDismiss()
+                                            onDayCompleted()
                                         },
                                         enabled = canNavigateNext
                                     ) {
@@ -599,25 +622,17 @@ fun QuizActivity(
     val optionD = activity["opcion_d"] as? String ?: "Option D"
     val correctAnswer = activity["respuesta_correcta"] as? String ?: "a"
     
-    // State for user selection and submission - use an activity-specific key to prevent selections persisting between quizzes
-    var selectedOption by remember(activityIndex) { mutableStateOf("") }
-    var hasSubmitted by remember(activityIndex) { mutableStateOf(false) }
+    // Get user_answer from the activity if it exists
+    val savedUserAnswer = activity["user_answer"] as? String ?: ""
     
-    // Check if this quiz has been answered before
-    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    val answersPath = "users/$userId/answers/${examId}_day${dayIndex}_activity${activityIndex}"
+    // State for user selection and submission - use activity-specific key to prevent selections persisting
+    var selectedOption by remember(activityIndex) { mutableStateOf(savedUserAnswer) }
+    var hasSubmitted by remember(activityIndex) { mutableStateOf(savedUserAnswer.isNotEmpty()) }
     
+    // If already answered, enable next navigation
     LaunchedEffect(activityIndex) {
-        if (userId.isNotEmpty() && examId.isNotEmpty()) {
-            db.document(answersPath).get()
-                .addOnSuccessListener { document ->
-                    if (document.exists()) {
-                        val answer = document.getString("user_answer") ?: ""
-                        selectedOption = answer
-                        hasSubmitted = true
-                        onSubmitComplete() // If already submitted, enable next navigation
-                    }
-                }
+        if (hasSubmitted) {
+            onSubmitComplete()
         }
     }
     
@@ -682,16 +697,50 @@ fun QuizActivity(
                 onClick = {
                     hasSubmitted = true
                     
-                    // Save answer to Firestore
-                    if (userId.isNotEmpty() && examId.isNotEmpty()) {
-                        val answer = hashMapOf(
-                            "user_answer" to selectedOption,
-                            "correct_answer" to correctAnswer,
-                            "timestamp" to com.google.firebase.Timestamp.now(),
-                            "is_correct" to (selectedOption == correctAnswer)
-                        )
-                        
-                        db.document(answersPath).set(answer)
+                    // Save answer directly to the exam document
+                    if (examId.isNotEmpty()) {
+                        // Get the current exam document
+                        db.collection("exams").document(examId).get()
+                            .addOnSuccessListener { document ->
+                                if (document.exists()) {
+                                    // Get the content array
+                                    val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
+                                    
+                                    if (content.size > dayIndex) {
+                                        // Get the day's map and activities
+                                        val updatedContent = content.toMutableList()
+                                        val dayMap = updatedContent[dayIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                        val activities = dayMap["actividades"] as? MutableList<Map<String, Any>> ?: mutableListOf()
+                                        
+                                        if (activities.size > activityIndex) {
+                                            // Update the activity with the user's answer
+                                            val updatedActivities = activities.toMutableList()
+                                            val activityMap = updatedActivities[activityIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                            
+                                            // Add user answer fields
+                                            activityMap["user_answer"] = selectedOption
+                                            activityMap["is_correct"] = (selectedOption == correctAnswer)
+                                            
+                                            // Update the activity in the list
+                                            updatedActivities[activityIndex] = activityMap
+                                            
+                                            // Update the day map
+                                            dayMap["actividades"] = updatedActivities
+                                            updatedContent[dayIndex] = dayMap
+                                            
+                                            // Update the exam document
+                                            db.collection("exams").document(examId)
+                                                .update("content", updatedContent)
+                                                .addOnSuccessListener {
+                                                    Log.d("QuizActivity", "Answer saved successfully")
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    Log.e("QuizActivity", "Error saving answer: ${e.message}")
+                                                }
+                                        }
+                                    }
+                                }
+                            }
                     }
                     
                     onSubmitComplete()
@@ -770,25 +819,17 @@ fun QuestionActivity(
 ) {
     val question = activity["pregunta"] as? String ?: "Question"
     
-    // State for user answer and submission - use an activity-specific key to prevent answers persisting between questions
-    var answer by remember(activityIndex) { mutableStateOf("") }
-    var hasSubmitted by remember(activityIndex) { mutableStateOf(false) }
+    // Get answer from the activity if it exists
+    val savedAnswer = activity["answer"] as? String ?: ""
     
-    // Check if this question has been answered before
-    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-    val answersPath = "users/$userId/answers/${examId}_day${dayIndex}_activity${activityIndex}"
+    // State for user answer and submission - use activity-specific key to prevent answers persisting
+    var answer by remember(activityIndex) { mutableStateOf(savedAnswer) }
+    var hasSubmitted by remember(activityIndex) { mutableStateOf(savedAnswer.isNotEmpty()) }
     
+    // If already answered, enable next navigation
     LaunchedEffect(activityIndex) {
-        if (userId.isNotEmpty() && examId.isNotEmpty()) {
-            db.document(answersPath).get()
-                .addOnSuccessListener { document ->
-                    if (document.exists()) {
-                        val savedAnswer = document.getString("answer") ?: ""
-                        answer = savedAnswer
-                        hasSubmitted = true
-                        onSubmitComplete() // If already submitted, enable next navigation
-                    }
-                }
+        if (hasSubmitted) {
+            onSubmitComplete()
         }
     }
     
@@ -841,14 +882,49 @@ fun QuestionActivity(
                     if (answer.isNotEmpty()) {
                         hasSubmitted = true
                         
-                        // Save answer to Firestore
-                        if (userId.isNotEmpty() && examId.isNotEmpty()) {
-                            val answerData = hashMapOf(
-                                "answer" to answer,
-                                "timestamp" to com.google.firebase.Timestamp.now()
-                            )
-                            
-                            db.document(answersPath).set(answerData)
+                        // Save answer directly to the exam document
+                        if (examId.isNotEmpty()) {
+                            // Get the current exam document
+                            db.collection("exams").document(examId).get()
+                                .addOnSuccessListener { document ->
+                                    if (document.exists()) {
+                                        // Get the content array
+                                        val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
+                                        
+                                        if (content.size > dayIndex) {
+                                            // Get the day's map and activities
+                                            val updatedContent = content.toMutableList()
+                                            val dayMap = updatedContent[dayIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                            val activities = dayMap["actividades"] as? MutableList<Map<String, Any>> ?: mutableListOf()
+                                            
+                                            if (activities.size > activityIndex) {
+                                                // Update the activity with the user's answer
+                                                val updatedActivities = activities.toMutableList()
+                                                val activityMap = updatedActivities[activityIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                                
+                                                // Add answer field
+                                                activityMap["answer"] = answer
+                                                
+                                                // Update the activity in the list
+                                                updatedActivities[activityIndex] = activityMap
+                                                
+                                                // Update the day map
+                                                dayMap["actividades"] = updatedActivities
+                                                updatedContent[dayIndex] = dayMap
+                                                
+                                                // Update the exam document
+                                                db.collection("exams").document(examId)
+                                                    .update("content", updatedContent)
+                                                    .addOnSuccessListener {
+                                                        Log.d("QuestionActivity", "Answer saved successfully")
+                                                    }
+                                                    .addOnFailureListener { e ->
+                                                        Log.e("QuestionActivity", "Error saving answer: ${e.message}")
+                                                    }
+                                            }
+                                        }
+                                    }
+                                }
                         }
                         
                         onSubmitComplete()
