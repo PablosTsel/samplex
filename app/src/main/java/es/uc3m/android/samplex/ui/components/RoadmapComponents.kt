@@ -248,7 +248,17 @@ fun DayActivitiesDialog(
     val activities = day.actividades
     var showIntro by remember { mutableStateOf(true) }
     var currentActivityIndex by remember { mutableIntStateOf(0) }
+    var canNavigateNext by remember { mutableStateOf(false) }
     val db = FirebaseFirestore.getInstance()
+    
+    // Function to determine if we can navigate to next activity
+    fun checkCanNavigateNext(activityType: String, hasSubmitted: Boolean) {
+        canNavigateNext = when (activityType) {
+            "Resumen" -> true
+            "Quiz", "Pregunta" -> hasSubmitted
+            else -> true
+        }
+    }
     
     Dialog(onDismissRequest = onDismiss) {
         Card(
@@ -283,12 +293,45 @@ fun DayActivitiesDialog(
                     // Intro screen
                     IntroContent(
                         activities = activities,
-                        onStartClick = { showIntro = false }
+                        onStartClick = { 
+                            showIntro = false
+                            // For Resumen type, we can navigate next immediately
+                            if (activities.isNotEmpty()) {
+                                val firstType = activities.firstOrNull()?.get("tipo") as? String ?: ""
+                                checkCanNavigateNext(firstType, false)
+                            }
+                        }
                     )
                 } else {
                     // Activity content
                     if (activities.isNotEmpty()) {
                         val activity = activities[currentActivityIndex]
+                        val activityType = activity["tipo"] as? String ?: ""
+                        
+                        // Reset canNavigateNext when activity changes based on type and submission state
+                        LaunchedEffect(currentActivityIndex) {
+                            val hasSubmitted = when (activityType) {
+                                "Quiz", "Pregunta" -> {
+                                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                                    val answersPath = "users/$userId/answers/${day.examId}_day${day.dayIndex}_activity${currentActivityIndex}"
+                                    var submitted = false
+                                    
+                                    if (userId.isNotEmpty() && day.examId.isNotEmpty()) {
+                                        try {
+                                            val document = db.document(answersPath).get().await()
+                                            submitted = document.exists()
+                                        } catch (e: Exception) {
+                                            Log.e("DayActivitiesDialog", "Error checking submission: ${e.message}")
+                                        }
+                                    }
+                                    submitted
+                                }
+                                "Resumen" -> true
+                                else -> true
+                            }
+                            
+                            checkCanNavigateNext(activityType, hasSubmitted)
+                        }
                         
                         // Display current activity
                         ActivityContent(
@@ -296,7 +339,11 @@ fun DayActivitiesDialog(
                             examId = day.examId,
                             dayIndex = day.dayIndex,
                             activityIndex = currentActivityIndex,
-                            db = db
+                            db = db,
+                            onSubmitComplete = { 
+                                // When Quiz or Question is submitted, enable Next navigation
+                                checkCanNavigateNext(activityType, true)
+                            }
                         )
                         
                         Spacer(modifier = Modifier.height(16.dp))
@@ -306,10 +353,10 @@ fun DayActivitiesDialog(
                             modifier = Modifier.fillMaxWidth(),
                             horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            // Previous button
+                            // Back button (not shown for first activity)
                             if (currentActivityIndex > 0) {
                                 Button(onClick = { currentActivityIndex-- }) {
-                                    Text("Previous")
+                                    Text("Back")
                                 }
                             } else {
                                 Spacer(modifier = Modifier.width(88.dp)) // Width of a Button
@@ -317,7 +364,10 @@ fun DayActivitiesDialog(
                             
                             // Next or Finish button
                             if (currentActivityIndex < activities.size - 1) {
-                                Button(onClick = { currentActivityIndex++ }) {
+                                Button(
+                                    onClick = { currentActivityIndex++ },
+                                    enabled = canNavigateNext
+                                ) {
                                     Text("Next")
                                 }
                             } else {
@@ -345,9 +395,10 @@ fun DayActivitiesDialog(
                                                 }
                                         }
                                         onDismiss()
-                                    }
+                                    },
+                                    enabled = canNavigateNext
                                 ) {
-                                    Text("Finish study")
+                                    Text("Finish")
                                 }
                             }
                         }
@@ -440,7 +491,8 @@ fun ActivityContent(
     examId: String,
     dayIndex: Int,
     activityIndex: Int,
-    db: FirebaseFirestore
+    db: FirebaseFirestore,
+    onSubmitComplete: () -> Unit
 ) {
     val activityType = activity["tipo"] as? String ?: ""
     
@@ -452,8 +504,8 @@ fun ActivityContent(
     
     when (activityType) {
         "Resumen" -> SummaryActivity(activity)
-        "Quiz" -> QuizActivity(activity, examId, dayIndex, activityIndex, db)
-        "Pregunta" -> QuestionActivity(activity, examId, dayIndex, activityIndex, db)
+        "Quiz" -> QuizActivity(activity, examId, dayIndex, activityIndex, db, onSubmitComplete)
+        "Pregunta" -> QuestionActivity(activity, examId, dayIndex, activityIndex, db, onSubmitComplete)
         else -> Text("Unknown activity type: $activityType")
     }
 }
@@ -492,7 +544,8 @@ fun QuizActivity(
     examId: String,
     dayIndex: Int,
     activityIndex: Int,
-    db: FirebaseFirestore
+    db: FirebaseFirestore,
+    onSubmitComplete: () -> Unit
 ) {
     val question = activity["pregunta"] as? String ?: "Question"
     val optionA = activity["opcion_a"] as? String ?: "Option A"
@@ -519,6 +572,7 @@ fun QuizActivity(
                         selectedOption = answer
                         savedAnswer = answer
                         hasSubmitted = true
+                        onSubmitComplete() // If already submitted, enable next navigation
                     }
                 }
         }
@@ -576,7 +630,7 @@ fun QuizActivity(
             onSelect = { if (!hasSubmitted) selectedOption = "d" }
         )
         
-        // Submit button
+        // Submit button - only show if not submitted yet
         if (!hasSubmitted && selectedOption.isNotEmpty()) {
             Button(
                 onClick = {
@@ -592,6 +646,8 @@ fun QuizActivity(
                         
                         db.document(answersPath).set(answer)
                     }
+                    
+                    onSubmitComplete()
                 },
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
@@ -662,7 +718,8 @@ fun QuestionActivity(
     examId: String,
     dayIndex: Int,
     activityIndex: Int,
-    db: FirebaseFirestore
+    db: FirebaseFirestore,
+    onSubmitComplete: () -> Unit
 ) {
     val question = activity["pregunta"] as? String ?: "Question"
     
@@ -682,6 +739,7 @@ fun QuestionActivity(
                         val savedAnswer = document.getString("answer") ?: ""
                         answer = savedAnswer
                         hasSubmitted = true
+                        onSubmitComplete() // If already submitted, enable next navigation
                     }
                 }
         }
@@ -727,7 +785,7 @@ fun QuestionActivity(
                 placeholder = { Text("Enter your answer here...") }
             )
             
-            // Submit button
+            // Submit button - only show if not submitted yet
             Button(
                 onClick = {
                     if (answer.isNotEmpty()) {
@@ -742,6 +800,8 @@ fun QuestionActivity(
                             
                             db.document(answersPath).set(answerData)
                         }
+                        
+                        onSubmitComplete()
                     }
                 },
                 modifier = Modifier
