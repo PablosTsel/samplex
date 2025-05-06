@@ -203,11 +203,13 @@ fun RoadmapPath(days: List<RoadmapDay>) {
     var showActivitiesDialog by remember { mutableStateOf(false) }
     var reloadRequired by remember { mutableStateOf(false) }
     
+    // Initialize the viewModel at the Composable level
+    val examViewModel: ExamViewModel = viewModel()
+    
     // Handle reload after completion
     LaunchedEffect(reloadRequired) {
         if (reloadRequired) {
-            // Fetch updated data - this should trigger a recomposition with updated day status
-            val examViewModel: ExamViewModel = viewModel()
+            // Fetch updated data using the viewModel initialized above
             selectedDay?.examId?.let { examId ->
                 examViewModel.fetchExamById(examId)
             }
