@@ -79,9 +79,10 @@ fun RoadmapDayNode(
     val isEven = position % 2 == 0
     
     // Determine color based on completion status and today
+    // Changed priority: completed takes precedence over today
     val nodeColor = when {
-        day.isToday() -> DayPurpleColor    // Today is purple
-        day.isCompleted -> DayGreenColor   // Completed days are green
+        day.isCompleted -> DayGreenColor   // Completed days are green (highest priority)
+        day.isToday() -> DayPurpleColor    // Today is purple (only if not completed)
         else -> DayBlueColor               // Future/incomplete days are blue
     }
     
@@ -344,17 +345,35 @@ fun DayActivitiesDialog(
                         // Check if activity has been submitted using a simpler approach
                         LaunchedEffect(currentActivityIndex) {
                             if (activityType == "Quiz" || activityType == "Pregunta") {
-                                val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                                val answersPath = "users/$userId/answers/${day.examId}_day${day.dayIndex}_activity${currentActivityIndex}"
-                                
-                                if (userId.isNotEmpty() && day.examId.isNotEmpty()) {
-                                    db.document(answersPath).get()
+                                // Check if this activity already has an answer stored in the exam document
+                                if (day.examId.isNotEmpty()) {
+                                    db.collection("exams").document(day.examId).get()
                                         .addOnSuccessListener { document ->
-                                            val submitted = document.exists()
-                                            checkCanNavigateNext(activityType, submitted)
+                                            if (document.exists()) {
+                                                val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
+                                                
+                                                if (content.size > day.dayIndex) {
+                                                    val dayMap = content[day.dayIndex] as? Map<String, Any> ?: emptyMap()
+                                                    val activities = dayMap["actividades"] as? List<Map<String, Any>> ?: emptyList()
+                                                    
+                                                    if (activities.size > currentActivityIndex) {
+                                                        val activityMap = activities[currentActivityIndex] as? Map<String, Any> ?: emptyMap()
+                                                        
+                                                        // Check for answer based on activity type
+                                                        val hasAnswer = if (activityType == "Quiz") {
+                                                            activityMap.containsKey("user_answer")
+                                                        } else {
+                                                            activityMap.containsKey("answer")
+                                                        }
+                                                        
+                                                        // If there's an answer, we can navigate forward
+                                                        checkCanNavigateNext(activityType, hasAnswer)
+                                                    }
+                                                }
+                                            }
                                         }
                                         .addOnFailureListener { e ->
-                                            Log.e("DayActivitiesDialog", "Error checking submission: ${e.message}")
+                                            Log.e("DayActivitiesDialog", "Error checking activity answers: ${e.message}")
                                             checkCanNavigateNext(activityType, false)
                                         }
                                 } else {
@@ -693,7 +712,7 @@ fun QuizActivity(
         
         Spacer(modifier = Modifier.height(16.dp))
         
-        // Submit button - only show if not submitted yet
+        // Submit button - only show if not submitted yet and an option is selected
         if (!hasSubmitted && selectedOption.isNotEmpty()) {
             Button(
                 onClick = {
@@ -878,7 +897,7 @@ fun QuestionActivity(
             
             Spacer(modifier = Modifier.height(16.dp))
             
-            // Submit button - only show if not submitted yet
+            // Submit button - only show if not submitted yet and the answer is not empty
             Button(
                 onClick = {
                     if (answer.isNotEmpty()) {
