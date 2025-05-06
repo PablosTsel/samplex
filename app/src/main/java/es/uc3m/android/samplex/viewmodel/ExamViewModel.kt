@@ -277,7 +277,7 @@ class ExamViewModel : ViewModel() {
                     val descripcion = dayMap["descripcion"] as? String ?: ""
                     val isFinal = dayMap["final"] as? Boolean ?: false
                     val isCompleted = dayMap["completed"] as? Boolean ?: false
-                    val tasks = dayMap["tasks"] as? List<Map<String, Any>> ?: emptyList()
+                    val actividades = dayMap["actividades"] as? List<Map<String, Any>> ?: emptyList()
                     
                     // Get current exam ID
                     val examId = _currentExam.value?.id ?: ""
@@ -287,7 +287,7 @@ class ExamViewModel : ViewModel() {
                         descripcion = descripcion,
                         final = isFinal,
                         isCompleted = isCompleted,
-                        tasks = tasks,
+                        actividades = actividades,
                         examId = examId,
                         dayIndex = index
                     )

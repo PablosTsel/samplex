@@ -1,5 +1,6 @@
 package es.uc3m.android.samplex.ui.components
 
+import android.util.Log
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -244,7 +245,7 @@ fun DayActivitiesDialog(
     day: RoadmapDay,
     onDismiss: () -> Unit
 ) {
-    val activities = day.tasks.map { it as Map<String, Any> }
+    val activities = day.actividades
     var showIntro by remember { mutableStateOf(true) }
     var currentActivityIndex by remember { mutableIntStateOf(0) }
     val db = FirebaseFirestore.getInstance()
@@ -373,7 +374,11 @@ fun IntroContent(
     var quizCount = 0
     var questionCount = 0
     
-    activities.forEach { activity ->
+    // Add logging to see what we're working with
+    Log.d("IntroContent", "Activities size: ${activities.size}")
+    activities.forEachIndexed { index, activity ->
+        Log.d("IntroContent", "Activity $index type: ${activity["tipo"]}")
+        
         when (activity["tipo"] as? String) {
             "Resumen" -> summaryCount++
             "Quiz" -> quizCount++
@@ -438,6 +443,12 @@ fun ActivityContent(
     db: FirebaseFirestore
 ) {
     val activityType = activity["tipo"] as? String ?: ""
+    
+    // Add logging to debug activity content
+    Log.d("ActivityContent", "Activity type: $activityType")
+    activity.forEach { (key, value) ->
+        Log.d("ActivityContent", "Key: $key, Value: $value")
+    }
     
     when (activityType) {
         "Resumen" -> SummaryActivity(activity)
