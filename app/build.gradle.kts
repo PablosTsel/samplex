@@ -44,6 +44,12 @@ android {
 }
 
 dependencies {
+    // PDF parsing
+    implementation("com.tom-roush:pdfbox-android:2.0.27.0")
+    
+    // HTTP Client para Cloud Functions
+    implementation("com.squareup.okhttp3:okhttp:4.10.0")
+    
     // Firebase dependencies
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)

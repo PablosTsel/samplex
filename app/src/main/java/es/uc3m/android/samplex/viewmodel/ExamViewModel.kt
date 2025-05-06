@@ -1,21 +1,31 @@
 package es.uc3m.android.samplex.viewmodel
 
+import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import es.uc3m.android.samplex.model.RoadmapDay
+import es.uc3m.android.samplex.utils.PdfTextExtractor
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.util.Date
 import java.util.UUID
 import java.text.SimpleDateFormat
 import java.util.Locale
 import android.util.Log
 import java.util.Calendar
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
+import org.json.JSONObject
+import java.util.concurrent.TimeUnit
 
 class ExamViewModel : ViewModel() {
     private val db = FirebaseFirestore.getInstance()
@@ -46,16 +56,83 @@ class ExamViewModel : ViewModel() {
     private val _lastCreatedExamId = MutableStateFlow<String?>(null)
     val lastCreatedExamId: StateFlow<String?> = _lastCreatedExamId
     
+    // Variable para almacenar el texto extraído del PDF
+    private var extractedPdfText: String = ""
+    
+    // Estado para mostrar si se está generando el roadmap
+    private val _isGeneratingRoadmap = MutableStateFlow(false)
+    val isGeneratingRoadmap: StateFlow<Boolean> = _isGeneratingRoadmap
+    
+    // Método para obtener el texto extraído del PDF
+    fun getExtractedPdfText(): String {
+        return extractedPdfText
+    }
+    
+    // Función para llamar a la Cloud Function y generar el roadmap
+    private fun callGenerateRoadmapFunction(examId: String, pdfText: String) {
+        viewModelScope.launch {
+            try {
+                Log.d("ExamViewModel", "Llamando a la función generate_roadmap")
+                
+                // Crear JSON para la petición
+                val jsonObject = JSONObject()
+                jsonObject.put("exam_id", examId)
+                jsonObject.put("pdf_text", pdfText)
+                
+                val requestBody = jsonObject.toString()
+                    .toRequestBody("application/json; charset=utf-8".toMediaType())
+                
+                // Crear la petición HTTP
+                val request = Request.Builder()
+                    .url("https://generate-roadmap-zfxlj2bydq-uc.a.run.app")
+                    .post(requestBody)
+                    .build()
+                
+                // Ejecutar la petición en un hilo secundario
+                withContext(Dispatchers.IO) {
+                    val client = OkHttpClient.Builder()
+                        .connectTimeout(60, TimeUnit.SECONDS)
+                        .readTimeout(3600, TimeUnit.SECONDS)
+                        .writeTimeout(60, TimeUnit.SECONDS)
+                        .build()
+                    
+                    try {
+                        val response = client.newCall(request).execute()
+                        if (response.isSuccessful) {
+                            Log.d("ExamViewModel", "Cloud Function ejecutada con éxito")
+                        } else {
+                            Log.e("ExamViewModel", "Error en Cloud Function: ${response.code}")
+                        }
+                    } catch (e: Exception) {
+                        Log.e("ExamViewModel", "Error al llamar a la Cloud Function: ${e.message}")
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("ExamViewModel", "Error: ${e.message}")
+            }
+        }
+    }
+    
     init {
         fetchUserExams()
     }
     
-    fun createExam(subjectName: String, examDate: Date, isEmergency: Boolean = false, contentUri: Uri? = null) {
+    fun createExam(context: Context, subjectName: String, examDate: Date, isEmergency: Boolean = false, contentUri: Uri? = null) {
         viewModelScope.launch {
             try {
                 _isLoading.value = true
                 _error.value = null
                 _examCreated.value = false
+                
+                // Extraer texto del PDF si hay contentUri
+                if (contentUri != null) {
+                    extractedPdfText = PdfTextExtractor.extractTextFromPdf(context, contentUri)
+                    Log.d("ExamViewModel", "Texto extraído: ${extractedPdfText.take(100)}...")
+                    // Log adicional para verificar fácilmente que funciona
+                    Log.e("PDF_EXTRACTION_TEST", "✓ TEXTO EXTRAÍDO CON ÉXITO - ${extractedPdfText.length} caracteres")
+                } else {
+                    extractedPdfText = ""
+                }
                 
                 val currentUser = auth.currentUser
                 if (currentUser == null) {
@@ -97,12 +174,23 @@ class ExamViewModel : ViewModel() {
                 
                 // Save the last created exam ID
                 _lastCreatedExamId.value = examId
+                
+                // Si hay texto extraído del PDF, generar el roadmap
+                if (extractedPdfText.isNotEmpty()) {
+                    // Llamar a la Cloud Function para generar el roadmap
+                    Log.d("ExamViewModel", "Llamando a la Cloud Function para generar roadmap")
+                    callGenerateRoadmapFunction(examId, extractedPdfText)
+                } else {
+                    Log.d("ExamViewModel", "No se generó roadmap porque no hay texto extraído del PDF")
+                }
+                
                 _examCreated.value = true
                 
                 // Refresh exam list
                 fetchUserExams()
             } catch (e: Exception) {
                 _error.value = e.message
+                Log.e("ExamViewModel", "Error al crear examen: ${e.message}", e)
             } finally {
                 _isLoading.value = false
             }
@@ -294,4 +382,4 @@ data class StudyTask(
     val title: String = "",
     val content: String = "",
     val completed: Boolean = false
-) 
+)

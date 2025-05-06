@@ -55,6 +55,7 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import androidx.compose.material3.HorizontalDivider
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -549,6 +550,8 @@ fun HomeScreen(
                             // Extract string resources before using them in the onClick
                             val emptyFieldsError = stringResource(id = R.string.error_empty_fields)
                             val dateRequiredError = stringResource(id = R.string.error_date_required)
+                            // Obtener contexto fuera del onClick
+                            val context = LocalContext.current
                             
                             Button(
                                 onClick = {
@@ -565,6 +568,7 @@ fun HomeScreen(
                                         else -> {
                                             // Create exam
                                             examViewModel.createExam(
+                                                context = context,
                                                 subjectName = subjectName,
                                                 examDate = examDate!!,
                                                 isEmergency = isEmergencyExam,
@@ -642,4 +646,4 @@ fun HomeScreen(
             }
         }
     }
-} 
+}
