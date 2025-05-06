@@ -2,6 +2,7 @@ package es.uc3m.android.samplex.ui.components
 
 import android.util.Log
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -251,6 +252,7 @@ fun DayActivitiesDialog(
     var currentActivityIndex by remember { mutableIntStateOf(0) }
     var canNavigateNext by remember { mutableStateOf(false) }
     val db = FirebaseFirestore.getInstance()
+    val scrollState = rememberScrollState()
     
     // Function to determine if we can navigate to next activity
     fun checkCanNavigateNext(activityType: String, hasSubmitted: Boolean) {
@@ -259,6 +261,11 @@ fun DayActivitiesDialog(
             "Quiz", "Pregunta" -> hasSubmitted
             else -> true
         }
+    }
+    
+    // Reset scroll position when activity changes
+    LaunchedEffect(currentActivityIndex) {
+        scrollState.scrollTo(0)
     }
     
     Dialog(onDismissRequest = onDismiss) {
@@ -347,6 +354,7 @@ fun DayActivitiesDialog(
                                 dayIndex = day.dayIndex,
                                 activityIndex = currentActivityIndex,
                                 db = db,
+                                scrollState = scrollState,
                                 onSubmitComplete = { 
                                     // When Quiz or Question is submitted, enable Next navigation
                                     checkCanNavigateNext(activityType, true)
@@ -393,10 +401,11 @@ fun DayActivitiesDialog(
                                         Text("Next")
                                     }
                                 } else {
+                                    // Show Exit if already completed, otherwise show Finish
                                     Button(
                                         onClick = {
-                                            // Mark day as completed in Firestore
-                                            if (day.examId.isNotEmpty()) {
+                                            // If not completed, mark day as completed in Firestore
+                                            if (!day.isCompleted && day.examId.isNotEmpty()) {
                                                 db.collection("exams")
                                                     .document(day.examId)
                                                     .get()
@@ -420,7 +429,7 @@ fun DayActivitiesDialog(
                                         },
                                         enabled = canNavigateNext
                                     ) {
-                                        Text("Finish")
+                                        Text(if (day.isCompleted) "Exit" else "Finish")
                                     }
                                 }
                             }
@@ -515,6 +524,7 @@ fun ActivityContent(
     dayIndex: Int,
     activityIndex: Int,
     db: FirebaseFirestore,
+    scrollState: ScrollState,
     onSubmitComplete: () -> Unit
 ) {
     val activityType = activity["tipo"] as? String ?: ""
@@ -526,15 +536,26 @@ fun ActivityContent(
     }
     
     when (activityType) {
-        "Resumen" -> SummaryActivity(activity)
-        "Quiz" -> QuizActivity(activity, examId, dayIndex, activityIndex, db, onSubmitComplete)
-        "Pregunta" -> QuestionActivity(activity, examId, dayIndex, activityIndex, db, onSubmitComplete)
+        "Resumen" -> {
+            // Wrap SummaryActivity in a scrollable Box
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(scrollState)
+            ) {
+                SummaryActivity(activity)
+            }
+        }
+        "Quiz" -> QuizActivity(activity, examId, dayIndex, activityIndex, db, scrollState, onSubmitComplete)
+        "Pregunta" -> QuestionActivity(activity, examId, dayIndex, activityIndex, db, scrollState, onSubmitComplete)
         else -> Text("Unknown activity type: $activityType")
     }
 }
 
 @Composable
-fun SummaryActivity(activity: Map<String, Any>) {
+fun SummaryActivity(
+    activity: Map<String, Any>
+) {
     val title = activity["titulo"] as? String ?: "Summary"
     val content = activity["contenido"] as? String ?: ""
     
@@ -544,7 +565,6 @@ fun SummaryActivity(activity: Map<String, Any>) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
             .padding(bottom = 16.dp)
     ) {
         Text(
@@ -569,6 +589,7 @@ fun QuizActivity(
     dayIndex: Int,
     activityIndex: Int,
     db: FirebaseFirestore,
+    scrollState: ScrollState,
     onSubmitComplete: () -> Unit
 ) {
     val question = activity["pregunta"] as? String ?: "Question"
@@ -578,23 +599,21 @@ fun QuizActivity(
     val optionD = activity["opcion_d"] as? String ?: "Option D"
     val correctAnswer = activity["respuesta_correcta"] as? String ?: "a"
     
-    // State for user selection and submission
-    var selectedOption by remember { mutableStateOf("") }
-    var hasSubmitted by remember { mutableStateOf(false) }
-    var savedAnswer by remember { mutableStateOf("") }
+    // State for user selection and submission - use an activity-specific key to prevent selections persisting between quizzes
+    var selectedOption by remember(activityIndex) { mutableStateOf("") }
+    var hasSubmitted by remember(activityIndex) { mutableStateOf(false) }
     
     // Check if this quiz has been answered before
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val answersPath = "users/$userId/answers/${examId}_day${dayIndex}_activity${activityIndex}"
     
-    LaunchedEffect(Unit) {
+    LaunchedEffect(activityIndex) {
         if (userId.isNotEmpty() && examId.isNotEmpty()) {
             db.document(answersPath).get()
                 .addOnSuccessListener { document ->
                     if (document.exists()) {
-                        val answer = document.getString("selectedOption") ?: ""
+                        val answer = document.getString("user_answer") ?: ""
                         selectedOption = answer
-                        savedAnswer = answer
                         hasSubmitted = true
                         onSubmitComplete() // If already submitted, enable next navigation
                     }
@@ -605,7 +624,7 @@ fun QuizActivity(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(bottom = 16.dp)
     ) {
         Text(
@@ -666,9 +685,10 @@ fun QuizActivity(
                     // Save answer to Firestore
                     if (userId.isNotEmpty() && examId.isNotEmpty()) {
                         val answer = hashMapOf(
-                            "selectedOption" to selectedOption,
-                            "correctOption" to correctAnswer,
-                            "timestamp" to com.google.firebase.Timestamp.now()
+                            "user_answer" to selectedOption,
+                            "correct_answer" to correctAnswer,
+                            "timestamp" to com.google.firebase.Timestamp.now(),
+                            "is_correct" to (selectedOption == correctAnswer)
                         )
                         
                         db.document(answersPath).set(answer)
@@ -745,19 +765,20 @@ fun QuestionActivity(
     dayIndex: Int,
     activityIndex: Int,
     db: FirebaseFirestore,
+    scrollState: ScrollState,
     onSubmitComplete: () -> Unit
 ) {
     val question = activity["pregunta"] as? String ?: "Question"
     
-    // State for user answer and submission
-    var answer by remember { mutableStateOf("") }
-    var hasSubmitted by remember { mutableStateOf(false) }
+    // State for user answer and submission - use an activity-specific key to prevent answers persisting between questions
+    var answer by remember(activityIndex) { mutableStateOf("") }
+    var hasSubmitted by remember(activityIndex) { mutableStateOf(false) }
     
     // Check if this question has been answered before
     val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
     val answersPath = "users/$userId/answers/${examId}_day${dayIndex}_activity${activityIndex}"
     
-    LaunchedEffect(Unit) {
+    LaunchedEffect(activityIndex) {
         if (userId.isNotEmpty() && examId.isNotEmpty()) {
             db.document(answersPath).get()
                 .addOnSuccessListener { document ->
@@ -774,7 +795,7 @@ fun QuestionActivity(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
+            .verticalScroll(scrollState)
             .padding(bottom = 16.dp)
     ) {
         Text(
