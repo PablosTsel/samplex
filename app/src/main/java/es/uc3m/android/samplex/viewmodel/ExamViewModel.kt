@@ -248,7 +248,7 @@ class ExamViewModel : ViewModel() {
     
     private fun parseRoadmapDays(content: List<Map<String, Any>>) {
         try {
-            val days = content.mapNotNull { dayMap ->
+            val days = content.mapIndexedNotNull { index, dayMap ->
                 try {
                     // Handle fecha as either Date or String
                     val fecha = when (val fechaValue = dayMap["fecha"]) {
@@ -279,12 +279,17 @@ class ExamViewModel : ViewModel() {
                     val isCompleted = dayMap["completed"] as? Boolean ?: false
                     val tasks = dayMap["tasks"] as? List<Map<String, Any>> ?: emptyList()
                     
+                    // Get current exam ID
+                    val examId = _currentExam.value?.id ?: ""
+                    
                     RoadmapDay(
                         fecha = fecha,
                         descripcion = descripcion,
                         final = isFinal,
                         isCompleted = isCompleted,
-                        tasks = tasks
+                        tasks = tasks,
+                        examId = examId,
+                        dayIndex = index
                     )
                 } catch (e: Exception) {
                     Log.e("ExamViewModel", "Error creating RoadmapDay: ${e.message}")

@@ -14,7 +14,9 @@ data class RoadmapDay(
     val descripcion: String,
     val final: Boolean = false,
     val isCompleted: Boolean = false,
-    val tasks: List<Map<String, Any>> = emptyList()
+    val tasks: List<Map<String, Any>> = emptyList(),
+    val examId: String = "",  // ID of the exam this day belongs to
+    val dayIndex: Int = 0     // Index of this day in the content array
 ) {
     /**
      * Returns a formatted date string (e.g., "May 5")
