@@ -56,6 +56,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import es.uc3m.android.samplex.model.RoadmapDay
 import es.uc3m.android.samplex.ui.theme.BabyBlueDark
 import es.uc3m.android.samplex.ui.components.StarShape
+import kotlinx.coroutines.tasks.await
 
 // Colors
 private val DayBlueColor = BabyBlueDark
@@ -308,29 +309,29 @@ fun DayActivitiesDialog(
                         val activity = activities[currentActivityIndex]
                         val activityType = activity["tipo"] as? String ?: ""
                         
-                        // Reset canNavigateNext when activity changes based on type and submission state
+                        // Check if activity has been submitted using a simpler approach
                         LaunchedEffect(currentActivityIndex) {
-                            val hasSubmitted = when (activityType) {
-                                "Quiz", "Pregunta" -> {
-                                    val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
-                                    val answersPath = "users/$userId/answers/${day.examId}_day${day.dayIndex}_activity${currentActivityIndex}"
-                                    var submitted = false
-                                    
-                                    if (userId.isNotEmpty() && day.examId.isNotEmpty()) {
-                                        try {
-                                            val document = db.document(answersPath).get().await()
-                                            submitted = document.exists()
-                                        } catch (e: Exception) {
-                                            Log.e("DayActivitiesDialog", "Error checking submission: ${e.message}")
+                            if (activityType == "Quiz" || activityType == "Pregunta") {
+                                val userId = FirebaseAuth.getInstance().currentUser?.uid ?: ""
+                                val answersPath = "users/$userId/answers/${day.examId}_day${day.dayIndex}_activity${currentActivityIndex}"
+                                
+                                if (userId.isNotEmpty() && day.examId.isNotEmpty()) {
+                                    db.document(answersPath).get()
+                                        .addOnSuccessListener { document ->
+                                            val submitted = document.exists()
+                                            checkCanNavigateNext(activityType, submitted)
                                         }
-                                    }
-                                    submitted
+                                        .addOnFailureListener { e ->
+                                            Log.e("DayActivitiesDialog", "Error checking submission: ${e.message}")
+                                            checkCanNavigateNext(activityType, false)
+                                        }
+                                } else {
+                                    checkCanNavigateNext(activityType, false)
                                 }
-                                "Resumen" -> true
-                                else -> true
+                            } else {
+                                // For Resumen, always allow navigation
+                                checkCanNavigateNext(activityType, true)
                             }
-                            
-                            checkCanNavigateNext(activityType, hasSubmitted)
                         }
                         
                         // Display current activity
