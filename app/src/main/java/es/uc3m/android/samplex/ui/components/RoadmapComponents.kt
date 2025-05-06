@@ -334,72 +334,94 @@ fun DayActivitiesDialog(
                             }
                         }
                         
-                        // Display current activity
-                        ActivityContent(
-                            activity = activity,
-                            examId = day.examId,
-                            dayIndex = day.dayIndex,
-                            activityIndex = currentActivityIndex,
-                            db = db,
-                            onSubmitComplete = { 
-                                // When Quiz or Question is submitted, enable Next navigation
-                                checkCanNavigateNext(activityType, true)
-                            }
-                        )
-                        
-                        Spacer(modifier = Modifier.height(16.dp))
-                        
-                        // Navigation buttons
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween
+                        // Content area - scrollable if needed
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .weight(1f)
                         ) {
-                            // Back button (not shown for first activity)
-                            if (currentActivityIndex > 0) {
-                                Button(onClick = { currentActivityIndex-- }) {
-                                    Text("Back")
+                            // Display current activity
+                            ActivityContent(
+                                activity = activity,
+                                examId = day.examId,
+                                dayIndex = day.dayIndex,
+                                activityIndex = currentActivityIndex,
+                                db = db,
+                                onSubmitComplete = { 
+                                    // When Quiz or Question is submitted, enable Next navigation
+                                    checkCanNavigateNext(activityType, true)
                                 }
-                            } else {
-                                Spacer(modifier = Modifier.width(88.dp)) // Width of a Button
-                            }
-                            
-                            // Next or Finish button
-                            if (currentActivityIndex < activities.size - 1) {
-                                Button(
-                                    onClick = { currentActivityIndex++ },
-                                    enabled = canNavigateNext
-                                ) {
-                                    Text("Next")
+                            )
+                        }
+                        
+                        // Clear separation between content and navigation buttons
+                        Spacer(modifier = Modifier.height(24.dp))
+                        
+                        // Navigation buttons in clearly separated section
+                        Surface(
+                            modifier = Modifier.fillMaxWidth(),
+                            color = Color(0xFFF5F5F5),
+                            shape = RoundedCornerShape(8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // Back button (not shown for first activity)
+                                if (currentActivityIndex > 0) {
+                                    Button(onClick = { currentActivityIndex-- }) {
+                                        Text("Back")
+                                    }
+                                } else {
+                                    Spacer(modifier = Modifier.width(88.dp)) // Width of a Button
                                 }
-                            } else {
-                                Button(
-                                    onClick = {
-                                        // Mark day as completed in Firestore
-                                        if (day.examId.isNotEmpty()) {
-                                            db.collection("exams")
-                                                .document(day.examId)
-                                                .get()
-                                                .addOnSuccessListener { document ->
-                                                    if (document != null && document.exists()) {
-                                                        val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
-                                                        if (content.size > day.dayIndex) {
-                                                            val updatedContent = content.toMutableList()
-                                                            val dayMap = updatedContent[day.dayIndex] as? MutableMap<String, Any> ?: mutableMapOf()
-                                                            dayMap["completed"] = true
-                                                            updatedContent[day.dayIndex] = dayMap
-                                                            
-                                                            db.collection("exams")
-                                                                .document(day.examId)
-                                                                .update("content", updatedContent)
+                                
+                                // Counter showing current position
+                                Text(
+                                    text = "${currentActivityIndex + 1}/${activities.size}",
+                                    modifier = Modifier.align(Alignment.CenterVertically)
+                                )
+                                
+                                // Next or Finish button
+                                if (currentActivityIndex < activities.size - 1) {
+                                    Button(
+                                        onClick = { currentActivityIndex++ },
+                                        enabled = canNavigateNext
+                                    ) {
+                                        Text("Next")
+                                    }
+                                } else {
+                                    Button(
+                                        onClick = {
+                                            // Mark day as completed in Firestore
+                                            if (day.examId.isNotEmpty()) {
+                                                db.collection("exams")
+                                                    .document(day.examId)
+                                                    .get()
+                                                    .addOnSuccessListener { document ->
+                                                        if (document != null && document.exists()) {
+                                                            val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
+                                                            if (content.size > day.dayIndex) {
+                                                                val updatedContent = content.toMutableList()
+                                                                val dayMap = updatedContent[day.dayIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                                                dayMap["completed"] = true
+                                                                updatedContent[day.dayIndex] = dayMap
+                                                                
+                                                                db.collection("exams")
+                                                                    .document(day.examId)
+                                                                    .update("content", updatedContent)
+                                                            }
                                                         }
                                                     }
-                                                }
-                                        }
-                                        onDismiss()
-                                    },
-                                    enabled = canNavigateNext
-                                ) {
-                                    Text("Finish")
+                                            }
+                                            onDismiss()
+                                        },
+                                        enabled = canNavigateNext
+                                    ) {
+                                        Text("Finish")
+                                    }
                                 }
                             }
                         }
@@ -523,6 +545,7 @@ fun SummaryActivity(activity: Map<String, Any>) {
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = 16.dp)
     ) {
         Text(
             text = title,
@@ -583,6 +606,7 @@ fun QuizActivity(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = 16.dp)
     ) {
         Text(
             text = question,
@@ -631,6 +655,8 @@ fun QuizActivity(
             onSelect = { if (!hasSubmitted) selectedOption = "d" }
         )
         
+        Spacer(modifier = Modifier.height(16.dp))
+        
         // Submit button - only show if not submitted yet
         if (!hasSubmitted && selectedOption.isNotEmpty()) {
             Button(
@@ -652,7 +678,6 @@ fun QuizActivity(
                 },
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
-                    .padding(top = 16.dp)
             ) {
                 Text("Submit")
             }
@@ -750,6 +775,7 @@ fun QuestionActivity(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(rememberScrollState())
+            .padding(bottom = 16.dp)
     ) {
         Text(
             text = question,
@@ -786,6 +812,8 @@ fun QuestionActivity(
                 placeholder = { Text("Enter your answer here...") }
             )
             
+            Spacer(modifier = Modifier.height(16.dp))
+            
             // Submit button - only show if not submitted yet
             Button(
                 onClick = {
@@ -806,8 +834,7 @@ fun QuestionActivity(
                     }
                 },
                 modifier = Modifier
-                    .align(Alignment.End)
-                    .padding(top = 16.dp),
+                    .align(Alignment.End),
                 enabled = answer.isNotEmpty()
             ) {
                 Text("Submit")
