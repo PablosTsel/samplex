@@ -2,51 +2,60 @@ package es.uc3m.android.samplex.utils
 
 import android.content.Context
 import android.content.Intent
-import android.content.IntentSender
-import com.google.android.gms.auth.api.identity.BeginSignInRequest
-import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.auth.api.identity.Identity
-import com.google.android.gms.auth.api.identity.SignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignIn
+import com.google.android.gms.auth.api.signin.GoogleSignInAccount
+import com.google.android.gms.auth.api.signin.GoogleSignInClient
+import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
-import android.util.Log
 import kotlinx.coroutines.tasks.await
+import com.google.android.gms.tasks.Task
+import kotlinx.coroutines.suspendCancellableCoroutine
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
-class GoogleAuthUiClient(
-    private val context: Context,
-    private val oneTapClient: SignInClient = Identity.getSignInClient(context)
-) {
-    private val signInRequest = BeginSignInRequest.builder()
-        .setGoogleIdTokenRequestOptions(
-            BeginSignInRequest.GoogleIdTokenRequestOptions.builder()
-                .setSupported(true)
-                .setServerClientId("26913052212-meu6chh5glgke7b5knjfrs1rm7nh2o8a.apps.googleusercontent.com")
-                .setFilterByAuthorizedAccounts(false)
-                .build()
-        )
-        .setAutoSelectEnabled(false) // <- Esto fuerza el pop-up de selección de cuenta
+class GoogleAuthUiClient(private val context: Context) {
+
+    // Configuración con ID de cliente web y forzando selección de cuenta
+    private val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+        .requestIdToken("26913052212-meu6chh5glgke7b5knjfrs1rm7nh2o8a.apps.googleusercontent.com") // Tu client ID web
+        .requestEmail()
         .build()
 
-    suspend fun signIn(): IntentSender? {
-        val result = oneTapClient.beginSignIn(signInRequest).await()
-        return result.pendingIntent.intentSender
+    private val googleSignInClient: GoogleSignInClient = GoogleSignIn.getClient(context, gso)
+
+    // Este intent mostrará el selector de cuentas disponibles
+    fun getSignInIntent(): Intent {
+        // Cerramos sesión antes de lanzar el intent para forzar selector de cuenta
+        GoogleSignIn.getClient(context, gso).signOut()
+        return GoogleSignIn.getClient(context, gso).signInIntent
     }
+
 
     suspend fun signInWithIntent(intent: Intent): FirebaseUser? {
         return try {
-            val credential = oneTapClient.getSignInCredentialFromIntent(intent)
-            val idToken = credential.googleIdToken
-            val firebaseCredential = GoogleAuthProvider.getCredential(idToken, null)
-            FirebaseAuth.getInstance().signInWithCredential(firebaseCredential).await().user
-        } catch (e: ApiException) {
-            Log.e("GoogleAuthUiClient", "Error en signInWithIntent: ${e.statusCode} - ${e.message}")
-            null // devuelve null si se cancela o hay error
+            val task = GoogleSignIn.getSignedInAccountFromIntent(intent)
+            val account: GoogleSignInAccount = task.await()
+            val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+            val result = FirebaseAuth.getInstance().signInWithCredential(credential).await()
+            result.user
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
         }
     }
 
-
     fun signOut() {
         FirebaseAuth.getInstance().signOut()
+        googleSignInClient.signOut()
     }
 }
+
+// Extensión suspend para usar await con Tasks
+
+suspend fun <T> Task<T>.await(): T =
+    suspendCancellableCoroutine { cont ->
+        addOnSuccessListener { cont.resume(it) }
+        addOnFailureListener { cont.resumeWithException(it) }
+    }

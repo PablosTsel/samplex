@@ -2,7 +2,6 @@ package es.uc3m.android.samplex.ui.screens
 
 import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -53,13 +52,15 @@ fun AuthScreen(
     val googleAuthUiClient = remember { GoogleAuthUiClient(context) }
 
     val launcher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartIntentSenderForResult()
+        contract = ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        scope.launch {
+        if (result.resultCode == Activity.RESULT_OK) {
             result.data?.let { intent ->
-                val user = googleAuthUiClient.signInWithIntent(intent)
-                user?.let {
-                    authViewModel.onGoogleSignInSuccess(it)
+                scope.launch {
+                    val user = googleAuthUiClient.signInWithIntent(intent)
+                    user?.let {
+                        authViewModel.onGoogleSignInSuccess(it)
+                    }
                 }
             }
         }
@@ -97,26 +98,14 @@ fun AuthScreen(
                     ) {
                         Text(
                             text = buildAnnotatedString {
-                                withStyle(
-                                    style = SpanStyle(
-                                        fontWeight = FontWeight.Light,
-                                        color = LightText
-                                    )
-                                ) {
+                                withStyle(SpanStyle(fontWeight = FontWeight.Light, color = LightText)) {
                                     append("sample")
                                 }
-                                withStyle(
-                                    style = SpanStyle(
-                                        fontWeight = FontWeight.Bold,
-                                        color = BabyBlueDark
-                                    )
-                                ) {
+                                withStyle(SpanStyle(fontWeight = FontWeight.Bold, color = BabyBlueDark)) {
                                     append("x")
                                 }
                             },
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                letterSpacing = 2.sp
-                            )
+                            style = MaterialTheme.typography.headlineMedium.copy(letterSpacing = 2.sp)
                         )
                     }
                 }
@@ -137,9 +126,7 @@ fun AuthScreen(
                 verticalArrangement = Arrangement.Center
             ) {
                 Text(
-                    text = stringResource(
-                        id = if (isRegisterMode) R.string.create_account else R.string.sign_in
-                    ),
+                    text = stringResource(if (isRegisterMode) R.string.create_account else R.string.sign_in),
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Light,
                         letterSpacing = 1.sp
@@ -166,10 +153,7 @@ fun AuthScreen(
                                 value = email,
                                 onValueChange = { email = it },
                                 label = {
-                                    Text(
-                                        stringResource(id = R.string.email),
-                                        color = LightSecondaryText
-                                    )
+                                    Text(stringResource(id = R.string.email), color = LightSecondaryText)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
@@ -191,13 +175,11 @@ fun AuthScreen(
                                 value = password,
                                 onValueChange = { password = it },
                                 label = {
-                                    Text(
-                                        stringResource(id = R.string.password),
-                                        color = LightSecondaryText
-                                    )
+                                    Text(stringResource(id = R.string.password), color = LightSecondaryText)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
                                 colors = OutlinedTextFieldDefaults.colors(
                                     focusedBorderColor = BabyBlueDark,
                                     unfocusedBorderColor = BabyBlue,
@@ -207,8 +189,7 @@ fun AuthScreen(
                                     focusedContainerColor = Color.Transparent,
                                     unfocusedContainerColor = Color.Transparent
                                 ),
-                                shape = RoundedCornerShape(8.dp),
-                                visualTransformation = PasswordVisualTransformation()
+                                shape = RoundedCornerShape(8.dp)
                             )
 
                             Spacer(modifier = Modifier.height(24.dp))
@@ -236,11 +217,7 @@ fun AuthScreen(
                                         strokeWidth = 2.dp
                                     )
                                 } else {
-                                    Text(
-                                        text = stringResource(
-                                            id = if (isRegisterMode) R.string.create_account else R.string.sign_in
-                                        )
-                                    )
+                                    Text(text = stringResource(if (isRegisterMode) R.string.create_account else R.string.sign_in))
                                 }
                             }
 
@@ -249,15 +226,9 @@ fun AuthScreen(
                             TextButton(
                                 onClick = { isRegisterMode = !isRegisterMode },
                                 modifier = Modifier.align(Alignment.CenterHorizontally),
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = BabyBlueDark
-                                )
+                                colors = ButtonDefaults.textButtonColors(contentColor = BabyBlueDark)
                             ) {
-                                Text(
-                                    text = stringResource(
-                                        id = if (isRegisterMode) R.string.login_register_toggle else R.string.register_login_toggle
-                                    )
-                                )
+                                Text(text = stringResource(if (isRegisterMode) R.string.login_register_toggle else R.string.register_login_toggle))
                             }
 
                             Spacer(modifier = Modifier.height(8.dp))
@@ -266,37 +237,25 @@ fun AuthScreen(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Divider(
-                                    modifier = Modifier.weight(1f),
-                                    color = Color.Gray.copy(alpha = 0.3f)
-                                )
+                                Divider(modifier = Modifier.weight(1f), color = Color.Gray.copy(alpha = 0.3f))
                                 Text(
                                     text = "or",
                                     color = LightSecondaryText,
                                     modifier = Modifier.padding(horizontal = 8.dp)
                                 )
-                                Divider(
-                                    modifier = Modifier.weight(1f),
-                                    color = Color.Gray.copy(alpha = 0.3f)
-                                )
+                                Divider(modifier = Modifier.weight(1f), color = Color.Gray.copy(alpha = 0.3f))
                             }
 
                             Spacer(modifier = Modifier.height(16.dp))
 
                             OutlinedButton(
                                 onClick = {
-                                    scope.launch {
-                                        val intentSender = googleAuthUiClient.signIn()
-                                        intentSender?.let {
-                                            launcher.launch(IntentSenderRequest.Builder(it).build())
-                                        }
-                                    }
+                                    val signInIntent = googleAuthUiClient.getSignInIntent()
+                                    launcher.launch(signInIntent)
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 border = BorderStroke(1.dp, Color.Gray.copy(alpha = 0.3f)),
-                                colors = ButtonDefaults.outlinedButtonColors(
-                                    contentColor = LightText
-                                )
+                                colors = ButtonDefaults.outlinedButtonColors(contentColor = LightText)
                             ) {
                                 Text(stringResource(id = R.string.sign_in_google))
                             }
