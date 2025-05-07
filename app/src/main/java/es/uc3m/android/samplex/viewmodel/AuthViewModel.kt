@@ -129,7 +129,12 @@ class AuthViewModel : ViewModel() {
                         "nombre" to "",
                         "apellidos" to "",
                         "curso" to "",
-                        "exams" to emptyList<String>()
+                        "exams" to emptyList<Map<String, Any>>(),
+                        "streak" to hashMapOf(
+                            "count" to 0,
+                            "lastCompletedDate" to null,
+                            "currentDayCompleted" to false
+                        )
                     )
                     usersCollection.document(user.uid).set(userData).await()
                     Log.d(TAG, "Nuevo usuario añadido a Firestore: ${user.uid}")
