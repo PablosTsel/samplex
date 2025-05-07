@@ -68,15 +68,15 @@ object NotificationUtils {
             val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.drawable.ic_notification) // Ícono específico para notificaciones
                 .setLargeIcon(largeIcon) // Ícono grande a color
-                .setContentTitle("Recordatorio Samplex")
-                .setContentText("¡Recuerda hacer tus actividades para hoy!")
+                .setContentTitle("Samplex reminder")
+                .setContentText("Remember to complete your activities for today!")
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setColor(accentColor) // Color para tintes en notificaciones
                 .setContentIntent(pendingIntent)
                 .setAutoCancel(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setStyle(NotificationCompat.BigTextStyle()
-                    .bigText("¡Recuerda hacer tus actividades para hoy! Mantén tu racha diaria completando tus ejercicios pendientes."))
+                    .bigText("Remember to complete your activities for today! Keep your daily streak going by completing your pending exercises."))
                 .setCategory(NotificationCompat.CATEGORY_REMINDER)
             
             // En Android 8+, añadir badge
