@@ -116,12 +116,13 @@ fun HomeScreen(
                         val streakData = document.get("streak") as? Map<String, Any>
                         streakData?.let {
                             // Verificar si hay que reiniciar la racha
-                            val currentDayCompleted = it["currentDayCompleted"] as? Boolean ?: false
+                            val count = (it["count"] as? Long)?.toInt() ?: 0
+                            var currentDayCompleted = it["currentDayCompleted"] as? Boolean ?: false
                             val lastCompletedDate = it["lastCompletedDate"] as? com.google.firebase.Timestamp
                             
-                            // Si el día actual no está completado y hay una fecha de último completado
-                            if (!currentDayCompleted && lastCompletedDate != null) {
-                                // Crear calendario para comparación de fechas
+                            // Si hay una fecha de último completado
+                            if (lastCompletedDate != null) {
+                                // Crear calendario para fechas
                                 val today = Calendar.getInstance()
                                 today.set(Calendar.HOUR_OF_DAY, 0)
                                 today.set(Calendar.MINUTE, 0)
@@ -142,8 +143,38 @@ fun HomeScreen(
                                 lastDate.set(Calendar.SECOND, 0)
                                 lastDate.set(Calendar.MILLISECOND, 0)
                                 
-                                // Si la última fecha es anterior a ayer (más de un día sin actividad)
-                                if (lastDate.before(yesterday)) {
+                                // 1. Si el último día completado no es hoy, restablecer currentDayCompleted a false
+                                if (lastDate.get(Calendar.YEAR) != today.get(Calendar.YEAR) || 
+                                    lastDate.get(Calendar.DAY_OF_YEAR) != today.get(Calendar.DAY_OF_YEAR)) {
+                                    
+                                    // Solo actualizamos si currentDayCompleted es true
+                                    if (currentDayCompleted) {
+                                        Log.d("HomeScreen", "Nuevo día detectado - reiniciando currentDayCompleted a false")
+                                        
+                                        // Mantener los valores actuales excepto currentDayCompleted
+                                        val updatedStreakData = mapOf(
+                                            "count" to count,
+                                            "lastCompletedDate" to lastCompletedDate,
+                                            "currentDayCompleted" to false
+                                        )
+                                        
+                                        // Actualizar la variable local para las comprobaciones siguientes
+                                        currentDayCompleted = false
+                                        
+                                        // Actualizar en Firestore
+                                        FirebaseFirestore.getInstance().collection("users").document(userId)
+                                            .update("streak", updatedStreakData)
+                                            .addOnSuccessListener {
+                                                Log.d("HomeScreen", "currentDayCompleted reiniciado a false exitosamente")
+                                            }
+                                            .addOnFailureListener { e ->
+                                                Log.e("HomeScreen", "Error reiniciando currentDayCompleted: ${e.message}")
+                                            }
+                                    }
+                                }
+                                
+                                // 2. Si el día actual no está completado y el último completado es anterior a ayer
+                                if (!currentDayCompleted && lastDate.before(yesterday)) {
                                     Log.d("HomeScreen", "Detectada inactividad - reiniciando racha a 0")
                                     // Reiniciar la racha a 0
                                     val updatedStreakData = mapOf(
@@ -170,7 +201,6 @@ fun HomeScreen(
                             }
                             
                             // Si no se reinició la racha, actualizamos con el valor actual de Firestore
-                            val count = (it["count"] as? Long)?.toInt() ?: 0
                             streakCount.intValue = count
                         }
                     }
