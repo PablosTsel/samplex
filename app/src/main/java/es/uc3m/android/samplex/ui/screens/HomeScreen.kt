@@ -27,6 +27,7 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -469,7 +470,7 @@ fun HomeScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
-                                    imageVector = Icons.Default.Favorite,
+                                    imageVector = Icons.Default.LocalFireDepartment,
                                     contentDescription = null,
                                     tint = BabyBlueDark,
                                     modifier = Modifier.size(48.dp)
@@ -489,22 +490,6 @@ fun HomeScreen(
                                         text = "Keep it up! You're doing great!",
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = LightSecondaryText
-                                    )
-                                }
-                                
-                                Spacer(modifier = Modifier.weight(1f))
-                                
-                                IconButton(
-                                    onClick = { studyStreak.intValue++ },
-                                    modifier = Modifier
-                                        .clip(CircleShape)
-                                        .background(BabyBlueDark)
-                                        .size(40.dp)
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Default.Check,
-                                        contentDescription = "Mark today complete",
-                                        tint = Color.White
                                     )
                                 }
                             }
@@ -598,7 +583,10 @@ fun HomeScreen(
                                     Box(
                                         modifier = Modifier
                                             .size(50.dp)
-                                            .background(BabyBlueDark, CircleShape),
+                                            .background(
+                                                if (exam.completed == true) Color(0xFF81C784) else BabyBlueDark, 
+                                                CircleShape
+                                            ),
                                         contentAlignment = Alignment.Center
                                     ) {
                                         Text(

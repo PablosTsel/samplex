@@ -526,6 +526,45 @@ fun DayActivitiesDialog(
                                                                     .update("content", updatedContent)
                                                                     .addOnSuccessListener {
                                                                         Log.d("DayActivitiesDialog", "Day marked as completed successfully")
+                                                                        
+                                                                        // If this is the final day, also mark the exam as completed in the user document
+                                                                        if (day.final) {
+                                                                            // Get the userId from the exam document
+                                                                            val userId = document.getString("userId")
+                                                                            if (userId != null) {
+                                                                                // Find the exam in the user's exams array and update it
+                                                                                db.collection("users").document(userId)
+                                                                                    .get()
+                                                                                    .addOnSuccessListener { userDoc ->
+                                                                                        if (userDoc.exists()) {
+                                                                                            val exams = userDoc.get("exams") as? List<Map<String, Any>> ?: emptyList()
+                                                                                            val updatedExams = exams.map { exam ->
+                                                                                                if (exam["id"] == day.examId) {
+                                                                                                    // Add completed=true to this exam
+                                                                                                    val updatedExam = exam.toMutableMap()
+                                                                                                    updatedExam["completed"] = true
+                                                                                                    updatedExam
+                                                                                                } else {
+                                                                                                    exam
+                                                                                                }
+                                                                                            }
+                                                                                            
+                                                                                            // Update the user document
+                                                                                            db.collection("users").document(userId)
+                                                                                                .update("exams", updatedExams)
+                                                                                                .addOnSuccessListener {
+                                                                                                    Log.d("DayActivitiesDialog", "Exam marked as completed in user document")
+                                                                                                }
+                                                                                                .addOnFailureListener { e ->
+                                                                                                    Log.e("DayActivitiesDialog", "Error updating user document: ${e.message}")
+                                                                                                }
+                                                                                        }
+                                                                                    }
+                                                                                    .addOnFailureListener { e ->
+                                                                                        Log.e("DayActivitiesDialog", "Error fetching user document: ${e.message}")
+                                                                                    }
+                                                                            }
+                                                                        }
                                                                     }
                                                             }
                                                         }

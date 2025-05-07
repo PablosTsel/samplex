@@ -337,13 +337,17 @@ class ExamViewModel : ViewModel() {
                             val subjectName = examDoc.getString("subjectName") ?: ""
                             val isEmergency = examDoc.getBoolean("isEmergency") ?: false
                             
+                            // Check if the exam is marked as completed in the entry
+                            val isCompleted = entry["completed"] as? Boolean
+                            
                             examsList.add(
                                 Exam(
                                     id = examId,
                                     displayName = entry["name"] as String,
                                     subjectName = subjectName,
                                     examDate = examDate,
-                                    isEmergency = isEmergency
+                                    isEmergency = isEmergency,
+                                    completed = isCompleted
                                 )
                             )
                         } else {
@@ -351,7 +355,8 @@ class ExamViewModel : ViewModel() {
                             examsList.add(
                                 Exam(
                                     id = examId,
-                                    displayName = entry["name"] as String
+                                    displayName = entry["name"] as String,
+                                    completed = entry["completed"] as? Boolean
                                 )
                             )
                         }
@@ -361,7 +366,8 @@ class ExamViewModel : ViewModel() {
                         examsList.add(
                             Exam(
                                 id = examId,
-                                displayName = entry["name"] as String
+                                displayName = entry["name"] as String,
+                                completed = entry["completed"] as? Boolean
                             )
                         )
                     }
@@ -411,7 +417,8 @@ data class Exam(
     val createdAt: Date = Date(),
     val contentUri: String? = null,
     val content: List<Map<String, Any>> = emptyList(),
-    val days: List<StudyDay> = emptyList()
+    val days: List<StudyDay> = emptyList(),
+    val completed: Boolean? = null  // Whether the exam has been completed
 )
 
 // Data class to represent a day in the study plan
