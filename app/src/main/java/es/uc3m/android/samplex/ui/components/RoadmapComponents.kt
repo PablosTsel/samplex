@@ -988,7 +988,7 @@ fun QuestionActivity(
         if (hasSubmitted) {
             // Show saved answer
             Text(
-                text = "Tu respuesta:",
+                text = "Your answer:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -1008,7 +1008,7 @@ fun QuestionActivity(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Calificación: ${String.format("%.1f", grade)}",
+                    text = "Grade: ${String.format("%.1f", grade)}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold,
                     modifier = Modifier.padding(top = 8.dp)
@@ -1017,7 +1017,7 @@ fun QuestionActivity(
                 Spacer(modifier = Modifier.height(8.dp))
                 
                 Text(
-                    text = "Corrección:",
+                    text = "Correction:",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -1036,7 +1036,7 @@ fun QuestionActivity(
                 Spacer(modifier = Modifier.height(16.dp))
                 
                 Text(
-                    text = "Evaluando respuesta...",
+                    text = "Evaluating answer...",
                     style = MaterialTheme.typography.titleMedium,
                     modifier = Modifier.padding(top = 8.dp)
                 )
@@ -1055,7 +1055,7 @@ fun QuestionActivity(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp),
-                placeholder = { Text("Escribe tu respuesta aquí...") }
+                placeholder = { Text("Write your answer here...") }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
