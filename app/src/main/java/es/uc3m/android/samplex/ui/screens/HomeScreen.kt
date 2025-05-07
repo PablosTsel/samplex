@@ -66,6 +66,9 @@ import java.util.Locale
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.ui.platform.LocalContext
 import kotlin.random.Random
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -99,8 +102,30 @@ fun HomeScreen(
     val quoteIndex = dayOfYear % motivationalQuotes.size
     val todayQuote = motivationalQuotes[quoteIndex]
     
-    // Simulated streak (in a real app, this would come from a data store)
-    val studyStreak = remember { mutableIntStateOf(5) }
+    // State for the streak count
+    val streakCount = remember { mutableIntStateOf(0) }
+    
+    // Fetch the user's streak from Firestore
+    LaunchedEffect(Unit) {
+        val userId = FirebaseAuth.getInstance().currentUser?.uid
+        if (userId != null) {
+            FirebaseFirestore.getInstance().collection("users").document(userId)
+                .get()
+                .addOnSuccessListener { document ->
+                    if (document.exists()) {
+                        val streakData = document.get("streak") as? Map<String, Any>
+                        streakData?.let {
+                            // Update the streak count with the actual value from Firestore
+                            val count = (it["count"] as? Long)?.toInt() ?: 0
+                            streakCount.intValue = count
+                        }
+                    }
+                }
+                .addOnFailureListener {
+                    Log.e("HomeScreen", "Error fetching user streak: ${it.message}")
+                }
+        }
+    }
     
     // Generate days for the weekly calendar
     val weekCalendar = remember {
@@ -478,7 +503,7 @@ fun HomeScreen(
                                 
                                 Column {
                                     Text(
-                                        text = "${studyStreak.intValue} Day Streak",
+                                        text = "${streakCount.intValue} Day Streak",
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.Bold,
                                         color = LightText
