@@ -510,7 +510,11 @@ fun HomeScreen(
                                     )
                                     
                                     Text(
-                                        text = "Keep it up! You're doing great!",
+                                        text = if (streakCount.intValue > 0) {
+                                            "Keep it up! You're doing great!"
+                                        } else {
+                                            "Start a new streak today! Every journey begins with a single step."
+                                        },
                                         style = MaterialTheme.typography.bodyMedium,
                                         color = LightSecondaryText
                                     )
