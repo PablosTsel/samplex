@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -39,6 +40,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -59,7 +61,9 @@ import com.google.firebase.firestore.FirebaseFirestore
 import es.uc3m.android.samplex.model.RoadmapDay
 import es.uc3m.android.samplex.ui.theme.BabyBlueDark
 import es.uc3m.android.samplex.ui.components.StarShape
+import es.uc3m.android.samplex.utils.CloudFunctionClient
 import es.uc3m.android.samplex.viewmodel.ExamViewModel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.tasks.await
 import java.util.*
 
@@ -946,16 +950,24 @@ fun QuestionActivity(
 ) {
     val question = activity["pregunta"] as? String ?: "Question"
     
-    // Get answer from the activity if it exists
+    // Get saved data from the activity if it exists
     val savedAnswer = activity["answer"] as? String ?: ""
+    val savedGrade = activity["grade"] as? Double
+    val savedCorrection = activity["correction"] as? String
     
-    // State for user answer and submission - use activity-specific key to prevent answers persisting
+    // Scope para las coroutines
+    val coroutineScope = rememberCoroutineScope()
+    
+    // State for user answer and submission
     var answer by remember(activityIndex) { mutableStateOf(savedAnswer) }
     var hasSubmitted by remember(activityIndex) { mutableStateOf(savedAnswer.isNotEmpty()) }
+    var isEvaluating by remember { mutableStateOf(false) }
+    var grade by remember { mutableStateOf(savedGrade) }
+    var correction by remember { mutableStateOf(savedCorrection) }
     
-    // If already answered, enable next navigation
+    // If already answered and evaluated, enable next navigation
     LaunchedEffect(activityIndex) {
-        if (hasSubmitted) {
+        if (hasSubmitted && grade != null && correction != null) {
             onSubmitComplete()
         }
     }
@@ -976,7 +988,7 @@ fun QuestionActivity(
         if (hasSubmitted) {
             // Show saved answer
             Text(
-                text = "Your answer:",
+                text = "Tu respuesta:",
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.padding(top = 8.dp)
             )
@@ -990,6 +1002,51 @@ fun QuestionActivity(
                     .background(Color(0xFFE3F2FD), RoundedCornerShape(8.dp))
                     .padding(16.dp)
             )
+            
+            // Show evaluation if available
+            if (grade != null && correction != null) {
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Calificación: ${String.format("%.1f", grade)}",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Text(
+                    text = "Corrección:",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                
+                Text(
+                    text = correction ?: "",
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(8.dp)
+                        .background(Color(0xFFF5F5F5), RoundedCornerShape(8.dp))
+                        .padding(16.dp)
+                )
+            } else if (isEvaluating) {
+                // Show loading indicator while evaluating
+                Spacer(modifier = Modifier.height(16.dp))
+                
+                Text(
+                    text = "Evaluando respuesta...",
+                    style = MaterialTheme.typography.titleMedium,
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                
+                CircularProgressIndicator(
+                    modifier = Modifier
+                        .padding(16.dp)
+                        .align(Alignment.CenterHorizontally)
+                )
+            }
         } else {
             // Text field for answer
             TextField(
@@ -998,7 +1055,7 @@ fun QuestionActivity(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(160.dp),
-                placeholder = { Text("Enter your answer here...") }
+                placeholder = { Text("Escribe tu respuesta aquí...") }
             )
             
             Spacer(modifier = Modifier.height(16.dp))
@@ -1008,53 +1065,94 @@ fun QuestionActivity(
                 onClick = {
                     if (answer.isNotEmpty()) {
                         hasSubmitted = true
+                        isEvaluating = true
                         
-                        // Save answer directly to the exam document
-                        if (examId.isNotEmpty()) {
-                            // Get the current exam document
-                            db.collection("exams").document(examId).get()
-                                .addOnSuccessListener { document ->
-                                    if (document.exists()) {
-                                        // Get the content array
-                                        val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
+                        // Llamar al servicio de evaluación
+                        coroutineScope.launch {
+                            try {
+                                // Evaluar la respuesta usando CloudFunctionClient
+                                val evaluationResult = CloudFunctionClient.evaluateAnswer(question, answer)
+                                
+                                evaluationResult.fold(
+                                    onSuccess = { evaluation ->
+                                        // Guardar la calificación y la corrección
+                                        grade = evaluation.grade
+                                        correction = evaluation.correction
                                         
-                                        if (content.size > dayIndex) {
-                                            // Get the day's map and activities
-                                            val updatedContent = content.toMutableList()
-                                            val dayMap = updatedContent[dayIndex] as? MutableMap<String, Any> ?: mutableMapOf()
-                                            val activities = dayMap["actividades"] as? MutableList<Map<String, Any>> ?: mutableListOf()
-                                            
-                                            if (activities.size > activityIndex) {
-                                                // Update the activity with the user's answer
-                                                val updatedActivities = activities.toMutableList()
-                                                val activityMap = updatedActivities[activityIndex] as? MutableMap<String, Any> ?: mutableMapOf()
-                                                
-                                                // Add answer field
-                                                activityMap["answer"] = answer
-                                                
-                                                // Update the activity in the list
-                                                updatedActivities[activityIndex] = activityMap
-                                                
-                                                // Update the day map
-                                                dayMap["actividades"] = updatedActivities
-                                                updatedContent[dayIndex] = dayMap
-                                                
-                                                // Update the exam document
-                                                db.collection("exams").document(examId)
-                                                    .update("content", updatedContent)
-                                                    .addOnSuccessListener {
-                                                        Log.d("QuestionActivity", "Answer saved successfully")
+                                        // Get the current exam document
+                                        if (examId.isNotEmpty()) {
+                                            db.collection("exams").document(examId).get()
+                                                .addOnSuccessListener { document ->
+                                                    if (document.exists()) {
+                                                        // Get the content array
+                                                        val content = document.get("content") as? List<Map<String, Any>> ?: emptyList()
+                                                        
+                                                        if (content.size > dayIndex) {
+                                                            // Get the day's map and activities
+                                                            val updatedContent = content.toMutableList()
+                                                            val dayMap = updatedContent[dayIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                                            val activities = dayMap["actividades"] as? MutableList<Map<String, Any>> ?: mutableListOf()
+                                                            
+                                                            if (activities.size > activityIndex) {
+                                                                // Update the activity with the user's answer and evaluation
+                                                                val updatedActivities = activities.toMutableList()
+                                                                val activityMap = updatedActivities[activityIndex] as? MutableMap<String, Any> ?: mutableMapOf()
+                                                                
+                                                                // Add answer, grade and correction fields
+                                                                activityMap["answer"] = answer
+                                                                activityMap["grade"] = evaluation.grade
+                                                                activityMap["correction"] = evaluation.correction
+                                                                
+                                                                // Update the activity in the list
+                                                                updatedActivities[activityIndex] = activityMap
+                                                                
+                                                                // Update the day map
+                                                                dayMap["actividades"] = updatedActivities
+                                                                updatedContent[dayIndex] = dayMap
+                                                                
+                                                                // Update the exam document
+                                                                db.collection("exams").document(examId)
+                                                                    .update("content", updatedContent)
+                                                                    .addOnSuccessListener {
+                                                                        Log.d("QuestionActivity", "Answer and evaluation saved successfully")
+                                                                        onSubmitComplete()
+                                                                    }
+                                                                    .addOnFailureListener { e ->
+                                                                        Log.e("QuestionActivity", "Error saving answer and evaluation: ${e.message}")
+                                                                        isEvaluating = false
+                                                                    }
+                                                            } else {
+                                                                isEvaluating = false
+                                                                Log.e("QuestionActivity", "Activity index out of bounds")
+                                                            }
+                                                        } else {
+                                                            isEvaluating = false
+                                                            Log.e("QuestionActivity", "Day index out of bounds")
+                                                        }
+                                                    } else {
+                                                        isEvaluating = false
+                                                        Log.e("QuestionActivity", "Exam document does not exist")
                                                     }
-                                                    .addOnFailureListener { e ->
-                                                        Log.e("QuestionActivity", "Error saving answer: ${e.message}")
-                                                    }
-                                            }
+                                                }
+                                                .addOnFailureListener { e ->
+                                                    isEvaluating = false
+                                                    Log.e("QuestionActivity", "Error al obtener el documento: ${e.message}")
+                                                }
+                                        } else {
+                                            isEvaluating = false
+                                            Log.e("QuestionActivity", "Exam ID is empty")
                                         }
+                                    },
+                                    onFailure = { error ->
+                                        isEvaluating = false
+                                        Log.e("QuestionActivity", "Error evaluando respuesta: ${error.message}")
                                     }
-                                }
+                                )
+                            } catch (e: Exception) {
+                                isEvaluating = false
+                                Log.e("QuestionActivity", "Exception during evaluation: ${e.message}")
+                            }
                         }
-                        
-                        onSubmitComplete()
                     }
                 },
                 modifier = Modifier
