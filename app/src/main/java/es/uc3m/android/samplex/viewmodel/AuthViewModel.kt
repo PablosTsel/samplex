@@ -79,7 +79,12 @@ class AuthViewModel : ViewModel() {
                     "curso" to "",
                     "email" to email,
                     "exams" to emptyList<Map<String, Any>>(),
-                    "nombre" to ""
+                    "nombre" to "",
+                    "streak" to hashMapOf(
+                        "count" to 0,
+                        "lastCompletedDate" to null,
+                        "currentDayCompleted" to false
+                    )
                 )
                 
                 try {

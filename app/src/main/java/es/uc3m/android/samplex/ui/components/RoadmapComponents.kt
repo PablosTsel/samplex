@@ -61,6 +61,7 @@ import es.uc3m.android.samplex.ui.theme.BabyBlueDark
 import es.uc3m.android.samplex.ui.components.StarShape
 import es.uc3m.android.samplex.viewmodel.ExamViewModel
 import kotlinx.coroutines.tasks.await
+import java.util.*
 
 // Colors
 private val DayBlueColor = BabyBlueDark
@@ -527,11 +528,14 @@ fun DayActivitiesDialog(
                                                                     .addOnSuccessListener {
                                                                         Log.d("DayActivitiesDialog", "Day marked as completed successfully")
                                                                         
-                                                                        // If this is the final day, also mark the exam as completed in the user document
-                                                                        if (day.final) {
-                                                                            // Get the userId from the exam document
-                                                                            val userId = document.getString("userId")
-                                                                            if (userId != null) {
+                                                                        // Get the userId from the exam document to update streak
+                                                                        val userId = document.getString("userId")
+                                                                        if (userId != null) {
+                                                                            // Update user streak
+                                                                            updateUserStreak(userId, db)
+                                                                            
+                                                                            // If this is the final day, also mark the exam as completed in the user document
+                                                                            if (day.final) {
                                                                                 // Find the exam in the user's exams array and update it
                                                                                 db.collection("users").document(userId)
                                                                                     .get()
@@ -1107,4 +1111,149 @@ fun CongratulationsDialog(
             }
         }
     }
+}
+
+/**
+ * Actualiza la racha del usuario cuando completa un día de estudio
+ */
+private fun updateUserStreak(userId: String, db: FirebaseFirestore) {
+    db.collection("users").document(userId).get()
+        .addOnSuccessListener { userDoc ->
+            if (userDoc.exists()) {
+                // Obtener los datos actuales de la racha
+                val streakData = userDoc.get("streak") as? Map<String, Any> ?: mapOf(
+                    "count" to 0,
+                    "lastCompletedDate" to null,
+                    "currentDayCompleted" to false
+                )
+                
+                val count = (streakData["count"] as? Long ?: 0).toInt()
+                val lastCompletedDate = streakData["lastCompletedDate"] as? com.google.firebase.Timestamp
+                val currentDayCompleted = streakData["currentDayCompleted"] as? Boolean ?: false
+                
+                // Crear fechas para comparación
+                val today = Calendar.getInstance()
+                today.set(Calendar.HOUR_OF_DAY, 0)
+                today.set(Calendar.MINUTE, 0)
+                today.set(Calendar.SECOND, 0)
+                today.set(Calendar.MILLISECOND, 0)
+                
+                val yesterday = Calendar.getInstance()
+                yesterday.add(Calendar.DAY_OF_YEAR, -1)
+                yesterday.set(Calendar.HOUR_OF_DAY, 0)
+                yesterday.set(Calendar.MINUTE, 0)
+                yesterday.set(Calendar.SECOND, 0)
+                yesterday.set(Calendar.MILLISECOND, 0)
+                
+                // Calcular la nueva racha
+                val newStreak = when {
+                    // Primera vez que completa algo
+                    lastCompletedDate == null -> {
+                        Log.d("Streak", "First completion ever - setting streak to 1")
+                        mapOf(
+                            "count" to 1,
+                            "lastCompletedDate" to com.google.firebase.Timestamp.now(),
+                            "currentDayCompleted" to true
+                        )
+                    }
+                    
+                    // Ya completó algo hoy
+                    currentDayCompleted -> {
+                        Log.d("Streak", "Already completed something today - keeping streak at $count")
+                        mapOf(
+                            "count" to count,
+                            "lastCompletedDate" to com.google.firebase.Timestamp.now(),
+                            "currentDayCompleted" to true
+                        )
+                    }
+                    
+                    // Completó algo ayer - incrementar racha
+                    isYesterday(lastCompletedDate.toDate(), yesterday.time) -> {
+                        Log.d("Streak", "Completed yesterday - incrementing streak to ${count + 1}")
+                        mapOf(
+                            "count" to count + 1,
+                            "lastCompletedDate" to com.google.firebase.Timestamp.now(),
+                            "currentDayCompleted" to true
+                        )
+                    }
+                    
+                    // Completó algo hoy (pero currentDayCompleted estaba en false)
+                    isToday(lastCompletedDate.toDate(), today.time) -> {
+                        Log.d("Streak", "Completed today (flag was false) - keeping streak at $count")
+                        mapOf(
+                            "count" to count,
+                            "lastCompletedDate" to com.google.firebase.Timestamp.now(),
+                            "currentDayCompleted" to true
+                        )
+                    }
+                    
+                    // No completó nada ayer - resetear racha
+                    else -> {
+                        Log.d("Streak", "Gap in streak - resetting to 1")
+                        mapOf(
+                            "count" to 1,
+                            "lastCompletedDate" to com.google.firebase.Timestamp.now(),
+                            "currentDayCompleted" to true
+                        )
+                    }
+                }
+                
+                // Actualizar la racha en Firestore
+                db.collection("users").document(userId)
+                    .update("streak", newStreak)
+                    .addOnSuccessListener {
+                        Log.d("Streak", "Updated user streak: count=${newStreak["count"]}")
+                    }
+                    .addOnFailureListener { e ->
+                        Log.e("Streak", "Error updating streak: ${e.message}")
+                    }
+            }
+        }
+        .addOnFailureListener { e ->
+            Log.e("Streak", "Error fetching user data: ${e.message}")
+        }
+}
+
+/**
+ * Comprueba si la fecha dada es de ayer comparada con la fecha de referencia
+ */
+private fun isYesterday(date: Date, yesterdayDate: Date): Boolean {
+    val cal1 = Calendar.getInstance()
+    cal1.time = date
+    cal1.set(Calendar.HOUR_OF_DAY, 0)
+    cal1.set(Calendar.MINUTE, 0)
+    cal1.set(Calendar.SECOND, 0)
+    cal1.set(Calendar.MILLISECOND, 0)
+    
+    val cal2 = Calendar.getInstance()
+    cal2.time = yesterdayDate
+    cal2.set(Calendar.HOUR_OF_DAY, 0)
+    cal2.set(Calendar.MINUTE, 0)
+    cal2.set(Calendar.SECOND, 0)
+    cal2.set(Calendar.MILLISECOND, 0)
+    
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
+}
+
+/**
+ * Comprueba si la fecha dada es de hoy comparada con la fecha de referencia
+ */
+private fun isToday(date: Date, todayDate: Date): Boolean {
+    val cal1 = Calendar.getInstance()
+    cal1.time = date
+    cal1.set(Calendar.HOUR_OF_DAY, 0)
+    cal1.set(Calendar.MINUTE, 0)
+    cal1.set(Calendar.SECOND, 0)
+    cal1.set(Calendar.MILLISECOND, 0)
+    
+    val cal2 = Calendar.getInstance()
+    cal2.time = todayDate
+    cal2.set(Calendar.HOUR_OF_DAY, 0)
+    cal2.set(Calendar.MINUTE, 0)
+    cal2.set(Calendar.SECOND, 0)
+    cal2.set(Calendar.MILLISECOND, 0)
+    
+    return cal1.get(Calendar.YEAR) == cal2.get(Calendar.YEAR) &&
+           cal1.get(Calendar.DAY_OF_YEAR) == cal2.get(Calendar.DAY_OF_YEAR)
 } 
