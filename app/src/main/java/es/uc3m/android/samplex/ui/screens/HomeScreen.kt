@@ -115,7 +115,61 @@ fun HomeScreen(
                     if (document.exists()) {
                         val streakData = document.get("streak") as? Map<String, Any>
                         streakData?.let {
-                            // Update the streak count with the actual value from Firestore
+                            // Verificar si hay que reiniciar la racha
+                            val currentDayCompleted = it["currentDayCompleted"] as? Boolean ?: false
+                            val lastCompletedDate = it["lastCompletedDate"] as? com.google.firebase.Timestamp
+                            
+                            // Si el día actual no está completado y hay una fecha de último completado
+                            if (!currentDayCompleted && lastCompletedDate != null) {
+                                // Crear calendario para comparación de fechas
+                                val today = Calendar.getInstance()
+                                today.set(Calendar.HOUR_OF_DAY, 0)
+                                today.set(Calendar.MINUTE, 0)
+                                today.set(Calendar.SECOND, 0)
+                                today.set(Calendar.MILLISECOND, 0)
+                                
+                                val yesterday = Calendar.getInstance()
+                                yesterday.add(Calendar.DAY_OF_YEAR, -1)
+                                yesterday.set(Calendar.HOUR_OF_DAY, 0)
+                                yesterday.set(Calendar.MINUTE, 0)
+                                yesterday.set(Calendar.SECOND, 0)
+                                yesterday.set(Calendar.MILLISECOND, 0)
+                                
+                                val lastDate = Calendar.getInstance()
+                                lastDate.time = lastCompletedDate.toDate()
+                                lastDate.set(Calendar.HOUR_OF_DAY, 0)
+                                lastDate.set(Calendar.MINUTE, 0)
+                                lastDate.set(Calendar.SECOND, 0)
+                                lastDate.set(Calendar.MILLISECOND, 0)
+                                
+                                // Si la última fecha es anterior a ayer (más de un día sin actividad)
+                                if (lastDate.before(yesterday)) {
+                                    Log.d("HomeScreen", "Detectada inactividad - reiniciando racha a 0")
+                                    // Reiniciar la racha a 0
+                                    val updatedStreakData = mapOf(
+                                        "count" to 0,
+                                        "lastCompletedDate" to lastCompletedDate,
+                                        "currentDayCompleted" to false
+                                    )
+                                    
+                                    // Actualizar en Firestore
+                                    FirebaseFirestore.getInstance().collection("users").document(userId)
+                                        .update("streak", updatedStreakData)
+                                        .addOnSuccessListener {
+                                            // Actualizar la UI con el valor reiniciado
+                                            streakCount.intValue = 0
+                                            Log.d("HomeScreen", "Racha reiniciada a 0 exitosamente")
+                                        }
+                                        .addOnFailureListener { e ->
+                                            Log.e("HomeScreen", "Error reiniciando racha: ${e.message}")
+                                        }
+                                    
+                                    // Terminamos aquí para evitar que se actualice con el valor antiguo
+                                    return@let
+                                }
+                            }
+                            
+                            // Si no se reinició la racha, actualizamos con el valor actual de Firestore
                             val count = (it["count"] as? Long)?.toInt() ?: 0
                             streakCount.intValue = count
                         }
