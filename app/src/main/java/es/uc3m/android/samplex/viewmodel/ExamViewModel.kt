@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import es.uc3m.android.samplex.model.RoadmapDay
 import es.uc3m.android.samplex.utils.PdfTextExtractor
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -63,6 +64,10 @@ class ExamViewModel : ViewModel() {
     private val _isGeneratingRoadmap = MutableStateFlow(false)
     val isGeneratingRoadmap: StateFlow<Boolean> = _isGeneratingRoadmap
     
+    // Listeners para Firestore
+    private var examsListener: ListenerRegistration? = null
+    private var currentExamListener: ListenerRegistration? = null
+    
     // Método para obtener el texto extraído del PDF
     fun getExtractedPdfText(): String {
         return extractedPdfText
@@ -114,7 +119,32 @@ class ExamViewModel : ViewModel() {
     }
     
     init {
+        setupExamsListener()
         fetchUserExams()
+    }
+    
+    private fun setupExamsListener() {
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            return
+        }
+        
+        // Cancelar listener anterior si existe
+        examsListener?.remove()
+        
+        // Listener para la colección de usuarios (para seguir la lista de exámenes)
+        examsListener = db.collection("users").document(userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e("ExamViewModel", "Error listening for exams updates", error)
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot != null && snapshot.exists()) {
+                    // Actualizar lista de exámenes cuando cambie el documento del usuario
+                    fetchUserExams()
+                }
+            }
     }
     
     fun createExam(context: Context, subjectName: String, examDate: Date, isEmergency: Boolean = false, contentUri: Uri? = null) {
@@ -198,6 +228,9 @@ class ExamViewModel : ViewModel() {
     }
     
     fun fetchExamById(examId: String) {
+        // Cancelar listener anterior si existe
+        currentExamListener?.remove()
+        
         viewModelScope.launch {
             try {
                 _isLoading.value = true
@@ -237,6 +270,26 @@ class ExamViewModel : ViewModel() {
                 if (content.isNotEmpty()) {
                     parseRoadmapDays(content)
                 }
+                
+                // Añadir un listener en tiempo real para este examen específico
+                currentExamListener = db.collection("exams").document(examId)
+                    .addSnapshotListener { snapshot, error ->
+                        if (error != null) {
+                            Log.e("ExamViewModel", "Error listening for exam updates", error)
+                            return@addSnapshotListener
+                        }
+                        
+                        if (snapshot != null && snapshot.exists()) {
+                            // Actualizar los datos del examen y su roadmap cuando cambien
+                            val examData = snapshot.data
+                            
+                            // Actualizar roadmap si existe
+                            val updatedContent = examData?.get("content") as? List<Map<String, Any>> ?: emptyList()
+                            if (updatedContent.isNotEmpty()) {
+                                parseRoadmapDays(updatedContent)
+                            }
+                        }
+                    }
                 
             } catch (e: Exception) {
                 _error.value = e.message
@@ -403,6 +456,13 @@ class ExamViewModel : ViewModel() {
     // Add new function to manually update roadmap days for immediate UI updates
     fun updateRoadmapDaysManually(updatedDays: List<RoadmapDay>) {
         _roadmapDays.value = updatedDays
+    }
+    
+    override fun onCleared() {
+        // Limpiar todos los listeners cuando el ViewModel se destruye
+        examsListener?.remove()
+        currentExamListener?.remove()
+        super.onCleared()
     }
 }
 

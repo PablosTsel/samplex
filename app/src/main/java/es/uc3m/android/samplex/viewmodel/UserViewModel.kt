@@ -5,6 +5,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import es.uc3m.android.samplex.model.User
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,8 +32,37 @@ class UserViewModel : ViewModel() {
     private val _updateSuccess = MutableStateFlow(false)
     val updateSuccess: StateFlow<Boolean> = _updateSuccess
     
+    private var userListener: ListenerRegistration? = null
+    
     init {
-        fetchUserData()
+        setupUserListener()
+    }
+    
+    private fun setupUserListener() {
+        val userId = auth.currentUser?.uid
+        if (userId == null) {
+            _error.value = "User not authenticated"
+            return
+        }
+        
+        // Cancelar listener anterior si existe
+        userListener?.remove()
+        
+        // Configurar nuevo listener en tiempo real
+        userListener = usersCollection.document(userId)
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.e(TAG, "Error listening for user updates", error)
+                    _error.value = error.message
+                    return@addSnapshotListener
+                }
+                
+                if (snapshot != null && snapshot.exists()) {
+                    val user = snapshot.toObject(User::class.java)
+                    _userData.value = user
+                    Log.d(TAG, "User data updated in real-time: ${user?.email}")
+                }
+            }
     }
     
     fun fetchUserData() {
@@ -126,5 +156,11 @@ class UserViewModel : ViewModel() {
     
     fun resetUpdateSuccess() {
         _updateSuccess.value = false
+    }
+    
+    override fun onCleared() {
+        // Importante: remover los listeners cuando el ViewModel se destruye
+        userListener?.remove()
+        super.onCleared()
     }
 } 
