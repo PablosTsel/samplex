@@ -54,6 +54,9 @@ dependencies {
     implementation(platform(libs.firebase.bom))
     implementation(libs.firebase.firestore)
     implementation(libs.firebase.auth)
+    
+    // Work Manager para tareas programadas
+    implementation("androidx.work:work-runtime-ktx:2.8.1")
 
     // AndroidX core dependencies
     implementation(libs.androidx.core.ktx)
@@ -80,6 +83,7 @@ dependencies {
 
     // Added: Kotlin coroutines support for Firebase
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3")
+    implementation(libs.androidx.work.runtime.ktx)
 
     // Testing dependencies
     testImplementation(libs.junit)
