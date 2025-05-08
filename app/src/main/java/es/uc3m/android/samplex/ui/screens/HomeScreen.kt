@@ -26,6 +26,8 @@ import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -212,8 +214,13 @@ fun HomeScreen(
     }
     
     // Generate days for the weekly calendar
-    val weekCalendar = remember {
+    var weekOffset by remember { mutableIntStateOf(0) } // 0 = current week, -1 = previous week, 1 = next week
+    
+    val weekCalendar = remember(weekOffset) {
         val currentCalendar = Calendar.getInstance()
+        // Add weeks based on offset
+        currentCalendar.add(Calendar.WEEK_OF_YEAR, weekOffset)
+        
         val today = currentCalendar.get(Calendar.DAY_OF_WEEK)
         val days = mutableListOf<Pair<String, Date>>()
         
@@ -222,10 +229,19 @@ fun HomeScreen(
         
         for (i in 0 until 7) {
             val dayName = SimpleDateFormat("EEE", Locale.getDefault()).format(currentCalendar.time)
-            days.add(Pair(dayName, currentCalendar.time))
+            days.add(Pair(dayName, currentCalendar.time.clone() as Date))
             currentCalendar.add(Calendar.DAY_OF_WEEK, 1)
         }
         days
+    }
+    
+    // Functions to navigate between weeks
+    fun navigateToPreviousWeek() {
+        weekOffset -= 1
+    }
+    
+    fun navigateToNextWeek() {
+        weekOffset += 1
     }
 
     var showProfileMenu by remember { mutableStateOf(false) }
@@ -469,12 +485,49 @@ fun HomeScreen(
                                     
                                     Spacer(modifier = Modifier.width(8.dp))
                                     
-                                    Text(
-                                        text = "This Week",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = LightText
-                                    )
+                                    // Get first and last date of the displayed week for title
+                                    val firstDay = weekCalendar.first().second
+                                    val lastDay = weekCalendar.last().second
+                                    val dateRangeFormat = SimpleDateFormat("MMM d", Locale.getDefault())
+                                    val weekRangeText = "${dateRangeFormat.format(firstDay)} - ${dateRangeFormat.format(lastDay)}"
+                                    
+                                    Row(
+                                        modifier = Modifier.weight(1f),
+                                        horizontalArrangement = Arrangement.Center,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        // Previous week button
+                                        IconButton(
+                                            onClick = { navigateToPreviousWeek() },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowLeft,
+                                                contentDescription = "Previous Week",
+                                                tint = BabyBlueDark
+                                            )
+                                        }
+                                        
+                                        Text(
+                                            text = weekRangeText,
+                                            style = MaterialTheme.typography.titleMedium,
+                                            fontWeight = FontWeight.Bold,
+                                            color = LightText,
+                                            modifier = Modifier.padding(horizontal = 8.dp)
+                                        )
+                                        
+                                        // Next week button
+                                        IconButton(
+                                            onClick = { navigateToNextWeek() },
+                                            modifier = Modifier.size(32.dp)
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.KeyboardArrowRight,
+                                                contentDescription = "Next Week",
+                                                tint = BabyBlueDark
+                                            )
+                                        }
+                                    }
                                 }
                                 
                                 Spacer(modifier = Modifier.height(16.dp))
@@ -485,10 +538,11 @@ fun HomeScreen(
                                 ) {
                                     val today = Calendar.getInstance().time
                                     val dateFormat = SimpleDateFormat("dd", Locale.getDefault())
+                                    val todayDateStr = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(today)
                                     
                                     weekCalendar.forEach { (dayName, date) ->
-                                        val isToday = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(date) == 
-                                                      SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(today)
+                                        val dateStr = SimpleDateFormat("yyyyMMdd", Locale.getDefault()).format(date)
+                                        val isToday = dateStr == todayDateStr
                                         
                                         // Check if this date has any exams
                                         val hasExam = exams.any { exam -> 

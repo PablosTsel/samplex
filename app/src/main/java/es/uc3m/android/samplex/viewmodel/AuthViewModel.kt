@@ -67,10 +67,12 @@ class AuthViewModel : ViewModel() {
                 val userId = result.user?.uid
                 if (userId == null) throw Exception("Failed to get user ID after registration")
 
+                val authEmail = result.user?.email ?: email
+
                 val userData = hashMapOf(
                     "apellidos" to "",
                     "curso" to "",
-                    "email" to email,
+                    "email" to authEmail,
                     "exams" to emptyList<Map<String, Any>>(),
                     "nombre" to "",
                     "streak" to hashMapOf(
@@ -83,9 +85,11 @@ class AuthViewModel : ViewModel() {
                 try {
                     Log.d(TAG, "Creating Firestore document for user: $userId")
                     usersCollection.document(userId).set(userData).await()
+                    Log.d(TAG, "User document created with email: $authEmail")
                 } catch (e: Exception) {
                     Log.e(TAG, "Error creating document, trying with email as ID")
-                    usersCollection.document(email).set(userData).await()
+                    usersCollection.document(authEmail).set(userData).await()
+                    Log.d(TAG, "User document created with email ID: $authEmail")
                 }
 
             } catch (e: Exception) {
@@ -122,10 +126,17 @@ class AuthViewModel : ViewModel() {
                 _isLoading.value = true
                 _authError.value = null
 
+                val authEmail = user.email ?: ""
+                if (authEmail.isEmpty()) {
+                    Log.e(TAG, "Google sign-in user has no email")
+                    _authError.value = "Unable to retrieve email from Google account"
+                    return@launch
+                }
+
                 val userDoc = usersCollection.document(user.uid).get().await()
                 if (!userDoc.exists()) {
                     val userData = mapOf(
-                        "email" to user.email,
+                        "email" to authEmail,
                         "nombre" to "",
                         "apellidos" to "",
                         "curso" to "",
@@ -137,9 +148,10 @@ class AuthViewModel : ViewModel() {
                         )
                     )
                     usersCollection.document(user.uid).set(userData).await()
-                    Log.d(TAG, "Nuevo usuario añadido a Firestore: ${user.uid}")
+                    Log.d(TAG, "Nuevo usuario añadido a Firestore: ${user.uid} con email: $authEmail")
                 } else {
-                    Log.d(TAG, "Usuario ya existente en Firestore: ${user.uid}")
+                    usersCollection.document(user.uid).update("email", authEmail).await()
+                    Log.d(TAG, "Email actualizado para usuario existente: ${user.uid}, email: $authEmail")
                 }
 
                 _isLoggedIn.value = true

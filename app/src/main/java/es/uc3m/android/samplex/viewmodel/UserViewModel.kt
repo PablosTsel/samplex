@@ -81,11 +81,42 @@ class UserViewModel : ViewModel() {
                 val userDoc = usersCollection.document(userId).get().await()
                 if (userDoc.exists()) {
                     val user = userDoc.toObject(User::class.java)
-                    _userData.value = user
-                    Log.d(TAG, "User data fetched successfully: ${user?.email}")
+                    
+                    // If the email is empty or doesn't match the auth email, update it with auth email
+                    if (user != null && (user.email.isEmpty() || user.email != auth.currentUser?.email)) {
+                        auth.currentUser?.email?.let { authEmail ->
+                            Log.d(TAG, "Updating email from auth: $authEmail")
+                            
+                            // Update email in Firestore
+                            usersCollection.document(userId).update("email", authEmail).await()
+                            
+                            // Update local user object
+                            _userData.value = user.copy(email = authEmail)
+                        }
+                    } else {
+                        _userData.value = user
+                        Log.d(TAG, "User data fetched successfully: ${user?.email}")
+                    }
                 } else {
-                    Log.e(TAG, "User document not found")
-                    _error.value = "User profile not found"
+                    // User document not found, create it with information from auth
+                    auth.currentUser?.let { firebaseUser ->
+                        val email = firebaseUser.email ?: ""
+                        Log.d(TAG, "Creating new user document with email: $email")
+                        
+                        val newUser = User(
+                            nombre = "",
+                            apellidos = "",
+                            curso = "",
+                            email = email,
+                            exams = emptyList()
+                        )
+                        
+                        usersCollection.document(userId).set(newUser).await()
+                        _userData.value = newUser
+                    } ?: run {
+                        Log.e(TAG, "User document not found and no authenticated user")
+                        _error.value = "User profile not found"
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error fetching user data", e)
@@ -110,25 +141,22 @@ class UserViewModel : ViewModel() {
                 _updateSuccess.value = false
                 Log.d(TAG, "Updating user profile for ID: $userId")
                 
+                // Get the current auth email
+                val currentEmail = auth.currentUser?.email ?: ""
+                
                 // Only update the fields that can be modified
                 val userData = _userData.value
                 val updatedData = hashMapOf<String, Any>(
                     "nombre" to nombre,
                     "apellidos" to apellidos,
-                    "curso" to curso
+                    "curso" to curso,
+                    "email" to currentEmail // Always use the current auth email
                 )
                 
                 // Keep exams array if it exists
                 userData?.exams?.let {
                     if (it.isNotEmpty()) {
                         updatedData["exams"] = it
-                    }
-                }
-                
-                // Keep email
-                userData?.email?.let {
-                    if (it.isNotEmpty()) {
-                        updatedData["email"] = it
                     }
                 }
                 
@@ -140,7 +168,7 @@ class UserViewModel : ViewModel() {
                     nombre = nombre,
                     apellidos = apellidos,
                     curso = curso,
-                    email = userData?.email ?: "",
+                    email = currentEmail,
                     exams = userData?.exams ?: emptyList()
                 )
                 
